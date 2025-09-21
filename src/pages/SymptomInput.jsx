@@ -3,15 +3,15 @@ import { useLanguage } from '../context/LanguageContext';
 import Button from '../components/common/Button';
 import VoiceRecorder from '../components/symptom/VoiceRecorder';
 
-const SymptomInput = ({ onNavigate }) => {
+const SymptomInput = ({ onNavigate, patientData, updatePatientData }) => {
   const { getCurrentLanguage } = useLanguage();
   const currentLang = getCurrentLanguage();
 
-  // State management
-  const [symptomText, setSymptomText] = useState('');
-  const [selectedSymptoms, setSelectedSymptoms] = useState([]);
-  const [severity, setSeverity] = useState(5);
-  const [duration, setDuration] = useState('');
+  // State management - Initialize with existing data
+  const [symptomText, setSymptomText] = useState(patientData?.symptoms || '');
+  const [selectedSymptoms, setSelectedSymptoms] = useState(patientData?.selectedSymptoms || []);
+  const [severity, setSeverity] = useState(patientData?.severity || 5);
+  const [duration, setDuration] = useState(patientData?.duration || '');
   const [isRecording, setIsRecording] = useState(false);
 
   // Multilingual content
@@ -114,20 +114,39 @@ const SymptomInput = ({ onNavigate }) => {
 
   const currentContent = content[currentLang?.code] || content.en;
 
+  // Handle symptom text change
+  const handleSymptomTextChange = (text) => {
+    setSymptomText(text);
+    updatePatientData({ symptoms: text });
+  };
+
   // Handle symptom selection
   const toggleSymptom = (symptomId) => {
-    setSelectedSymptoms(prev => 
-      prev.includes(symptomId) 
-        ? prev.filter(s => s !== symptomId)
-        : [...prev, symptomId]
-    );
+    const newSelectedSymptoms = selectedSymptoms.includes(symptomId) 
+      ? selectedSymptoms.filter(s => s !== symptomId)
+      : [...selectedSymptoms, symptomId];
+    
+    setSelectedSymptoms(newSelectedSymptoms);
+    updatePatientData({ selectedSymptoms: newSelectedSymptoms });
+  };
+
+  // Handle severity change
+  const handleSeverityChange = (newSeverity) => {
+    setSeverity(newSeverity);
+    updatePatientData({ severity: newSeverity });
+  };
+
+  // Handle duration change
+  const handleDurationChange = (newDuration) => {
+    setDuration(newDuration);
+    updatePatientData({ duration: newDuration });
   };
 
   // Handle form submission
   const handleAnalyze = () => {
-    const symptomData = {
-      textDescription: symptomText,
-      voiceRecording: null, // Will be implemented with voice recording
+    // Final update to ensure all data is captured
+    const finalSymptomData = {
+      symptoms: symptomText,
       selectedSymptoms,
       severity,
       duration,
@@ -135,8 +154,8 @@ const SymptomInput = ({ onNavigate }) => {
       language: currentLang?.code
     };
 
-    // Store symptom data
-    localStorage.setItem('symptomData', JSON.stringify(symptomData));
+    // Update the patient data one final time
+    updatePatientData(finalSymptomData);
     
     // Navigate to loading/analysis page
     onNavigate('analysis-loading');
@@ -204,7 +223,7 @@ const SymptomInput = ({ onNavigate }) => {
             </label>
             <textarea
               value={symptomText}
-              onChange={(e) => setSymptomText(e.target.value)}
+              onChange={(e) => handleSymptomTextChange(e.target.value)}
               placeholder={currentContent.textInput.placeholder}
               rows={4}
               style={{
@@ -234,8 +253,8 @@ const SymptomInput = ({ onNavigate }) => {
             </label>
             <VoiceRecorder 
               onRecordingComplete={(audioBlob) => {
-                // Handle voice recording
                 console.log('Voice recorded:', audioBlob);
+                updatePatientData({ voiceRecording: audioBlob });
               }}
               currentContent={currentContent.voiceInput}
             />
@@ -306,7 +325,7 @@ const SymptomInput = ({ onNavigate }) => {
                 min="1"
                 max="10"
                 value={severity}
-                onChange={(e) => setSeverity(parseInt(e.target.value))}
+                onChange={(e) => handleSeverityChange(parseInt(e.target.value))}
                 style={{
                   width: '100%',
                   height: '8px',
@@ -352,7 +371,7 @@ const SymptomInput = ({ onNavigate }) => {
               {currentContent.duration.options.map((option) => (
                 <button
                   key={option.value}
-                  onClick={() => setDuration(option.value)}
+                  onClick={() => handleDurationChange(option.value)}
                   style={{
                     background: duration === option.value
                       ? 'rgba(76, 175, 80, 0.3)'

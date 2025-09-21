@@ -7,6 +7,7 @@ import BasicInformation from './pages/BasicInformation';
 import SymptomInput from './pages/SymptomInput';
 import AnalysisLoading from './pages/AnalysisLoading';
 import ResultsPage from './pages/ResultsPage';
+import ProviderListing from './pages/ProviderListing';
 import './App.css';
 
 function App() {
@@ -71,41 +72,7 @@ function App() {
         return <ResultsPage onNavigate={navigateTo} />;
         
       case 'provider-listing':
-        return (
-          <div style={{
-            minHeight: '100vh',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-            fontSize: '1.5rem',
-            textAlign: 'center',
-            fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
-          }}>
-            <div style={{ fontSize: '4rem', marginBottom: '2rem' }}>🏥</div>
-            <h2 style={{ marginBottom: '1rem' }}>Healthcare Providers</h2>
-            <p style={{ opacity: 0.8, fontSize: '1rem', marginBottom: '2rem' }}>
-              Coming Soon - Find nearby healthcare providers
-            </p>
-            <button
-              onClick={() => navigateTo('results')}
-              style={{
-                padding: '0.8rem 2rem',
-                borderRadius: '25px',
-                border: '2px solid rgba(255, 255, 255, 0.5)',
-                backgroundColor: 'transparent',
-                color: 'white',
-                fontSize: '1rem',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease'
-              }}
-            >
-              ← Back to Results
-            </button>
-          </div>
-        );
+        return <ProviderListing onNavigate={navigateTo} />;
         
       case 'follow-up-chat':
         return (
