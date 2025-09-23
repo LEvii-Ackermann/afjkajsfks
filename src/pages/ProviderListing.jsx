@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { LanguageContext } from '../context/LanguageContext';
 import Button from '../components/common/Button';
+import GoogleMapsService from '../services/api/googleMapsService';
 
 const ProviderListing = ({ onNavigate }) => {
   const { currentLanguage } = useContext(LanguageContext);
@@ -10,179 +11,88 @@ const ProviderListing = ({ onNavigate }) => {
   const [userLocation, setUserLocation] = useState(null);
   const [locationPermission, setLocationPermission] = useState('requesting');
   const [manualLocation, setManualLocation] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapsService, setMapsService] = useState(null);
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
   const [filters, setFilters] = useState({
-    specialty: 'all',
-    distance: 'all',
-    availability: 'all',
-    rating: 'all'
+    type: 'hospital',
+    radius: 10000, // 10km in meters
+    rating: 'all',
+    openNow: false
   });
-  const [radiusKm, setRadiusKm] = useState(10);
-
-  // Mock provider data with coordinates
-  const mockProviders = [
-    {
-      id: 1,
-      name: 'Dr. Rajesh Kumar',
-      specialty: 'General Physician',
-      experience: 15,
-      rating: 4.8,
-      photo: '👨‍⚕️',
-      hospital: 'Apollo Hospital',
-      location: 'Sector 26, Chandigarh',
-      coordinates: { lat: 30.7333, lng: 76.7794 }, // Chandigarh coordinates
-      distance: 2.3,
-      availability: 'available',
-      consultationFee: 500,
-      nextSlot: 'Today 3:00 PM',
-      languages: ['Hindi', 'English', 'Punjabi']
-    },
-    {
-      id: 2,
-      name: 'Dr. Priya Sharma',
-      specialty: 'Pediatrics',
-      experience: 12,
-      rating: 4.9,
-      photo: '👩‍⚕️',
-      hospital: 'Fortis Hospital',
-      location: 'Sector 62, Mohali',
-      coordinates: { lat: 30.7046, lng: 76.7179 },
-      distance: 8.5,
-      availability: 'available',
-      consultationFee: 600,
-      nextSlot: 'Tomorrow 10:00 AM',
-      languages: ['Hindi', 'English']
-    },
-    {
-      id: 3,
-      name: 'Dr. Amit Singh',
-      specialty: 'Cardiology',
-      experience: 20,
-      rating: 4.7,
-      photo: '👨‍⚕️',
-      hospital: 'PGI Chandigarh',
-      location: 'Sector 12, Chandigarh',
-      coordinates: { lat: 30.7194, lng: 76.7646 },
-      distance: 5.2,
-      availability: 'busy',
-      consultationFee: 800,
-      nextSlot: 'Tomorrow 2:00 PM',
-      languages: ['Hindi', 'English']
-    },
-    {
-      id: 4,
-      name: 'Dr. Sunita Rani',
-      specialty: 'Dermatology',
-      experience: 10,
-      rating: 4.6,
-      photo: '👩‍⚕️',
-      hospital: 'Max Hospital',
-      location: 'Sector 82, Mohali',
-      coordinates: { lat: 30.6942, lng: 76.7221 },
-      distance: 12.1,
-      availability: 'available',
-      consultationFee: 700,
-      nextSlot: 'Today 5:00 PM',
-      languages: ['Hindi', 'English', 'Punjabi']
-    },
-    {
-      id: 5,
-      name: 'Dr. Vikram Mehta',
-      specialty: 'Orthopedics',
-      experience: 18,
-      rating: 4.8,
-      photo: '👨‍⚕️',
-      hospital: 'Grecian Super Speciality Hospital',
-      location: 'Sector 69, Mohali',
-      coordinates: { lat: 30.7081, lng: 76.6956 },
-      distance: 15.3,
-      availability: 'offline',
-      consultationFee: 750,
-      nextSlot: 'Day after tomorrow 11:00 AM',
-      languages: ['Hindi', 'English']
-    },
-    {
-      id: 6,
-      name: 'Dr. Meera Gupta',
-      specialty: 'Gynecology',
-      experience: 14,
-      rating: 4.9,
-      photo: '👩‍⚕️',
-      hospital: 'Apollo Cradle',
-      location: 'Sector 43, Chandigarh',
-      coordinates: { lat: 30.7184, lng: 76.8131 },
-      distance: 6.8,
-      availability: 'available',
-      consultationFee: 650,
-      nextSlot: 'Today 4:30 PM',
-      languages: ['Hindi', 'English']
-    }
-  ];
 
   // Text content for multilingual support
   const text = {
     en: {
-      title: 'Healthcare Providers Near You',
+      title: 'Real Healthcare Providers Near You',
+      loadingProviders: 'Finding nearby healthcare providers...',
       locationDetected: 'Location detected',
       locationDenied: 'Location access denied. Please enter manually:',
-      enterLocation: 'Enter your location',
+      enterLocation: 'Enter your location (e.g., Chandigarh, India)',
       searchLocation: 'Search',
-      radiusLabel: 'Search within',
-      km: 'km',
-      filterBySpecialty: 'Filter by Specialty',
-      filterByDistance: 'Distance',
-      filterByAvailability: 'Availability',
-      filterByRating: 'Rating',
-      allSpecialties: 'All Specialties',
-      allDistances: 'All Distances',
-      allAvailability: 'All Status',
-      allRatings: 'All Ratings',
-      available: 'Available',
-      busy: 'Busy',
-      offline: 'Offline',
-      experience: 'Experience',
-      years: 'years',
+      mapView: 'Map View',
+      listView: 'List View',
+      filterByType: 'Type',
+      filterByRadius: 'Radius',
+      filterByRating: 'Minimum Rating',
+      openNowOnly: 'Open Now Only',
+      hospital: 'Hospitals',
+      doctor: 'Doctors',
+      pharmacy: 'Pharmacies',
+      dentist: 'Dentists',
+      physiotherapist: 'Physiotherapists',
       rating: 'Rating',
-      fee: 'Consultation Fee',
-      nextSlot: 'Next Slot',
-      book: 'Book',
+      reviews: 'reviews',
+      openNow: 'Open Now',
+      closed: 'Closed',
+      getDirections: 'Directions',
       call: 'Call',
-      message: 'Message',
-      video: 'Video Call',
+      website: 'Website',
+      viewDetails: 'View Details',
       backToResults: 'Back to Results',
-      noProviders: 'No providers found in your area. Try expanding your search radius.',
-      detecting: 'Detecting your location...'
+      noProviders: 'No healthcare providers found in your area. Try expanding your search radius.',
+      detecting: 'Detecting your location...',
+      kmAway: 'km away',
+      loadingMap: 'Loading map...',
+      mapError: 'Error loading map. Please try again.',
+      searchError: 'Error searching for providers. Please try again.',
+      noGoogleMapsKey: 'Google Maps API key not configured. Showing demo mode.'
     },
     hi: {
-      title: 'आपके निकट स्वास्थ्य प्रदाता',
+      title: 'आपके निकट वास्तविक स्वास्थ्य प्रदाता',
+      loadingProviders: 'निकटवर्ती स्वास्थ्य प्रदाताओं को खोजा जा रहा है...',
       locationDetected: 'स्थान का पता चल गया',
       locationDenied: 'स्थान पहुंच अस्वीकृत। कृपया मैन्युअल रूप से दर्ज करें:',
-      enterLocation: 'अपना स्थान दर्ज करें',
+      enterLocation: 'अपना स्थान दर्ज करें (जैसे चंडीगढ़, भारत)',
       searchLocation: 'खोजें',
-      radiusLabel: 'इसके भीतर खोजें',
-      km: 'किमी',
-      filterBySpecialty: 'विशेषता के अनुसार फ़िल्टर करें',
-      filterByDistance: 'दूरी',
-      filterByAvailability: 'उपलब्धता',
-      filterByRating: 'रेटिंग',
-      allSpecialties: 'सभी विशेषताएं',
-      allDistances: 'सभी दूरी',
-      allAvailability: 'सभी स्थिति',
-      allRatings: 'सभी रेटिंग',
-      available: 'उपलब्ध',
-      busy: 'व्यस्त',
-      offline: 'ऑफलाइन',
-      experience: 'अनुभव',
-      years: 'साल',
+      mapView: 'मैप व्यू',
+      listView: 'लिस्ट व्यू',
+      filterByType: 'प्रकार',
+      filterByRadius: 'त्रिज्या',
+      filterByRating: 'न्यूनतम रेटिंग',
+      openNowOnly: 'केवल खुले हुए',
+      hospital: 'अस्पताल',
+      doctor: 'डॉक्टर',
+      pharmacy: 'फार्मेसी',
+      dentist: 'दंत चिकित्सक',
+      physiotherapist: 'फिजियोथेरेपिस्ट',
       rating: 'रेटिंग',
-      fee: 'परामर्श शुल्क',
-      nextSlot: 'अगला स्लॉट',
-      book: 'बुक करें',
+      reviews: 'समीक्षाएं',
+      openNow: 'अभी खुला',
+      closed: 'बंद',
+      getDirections: 'दिशा-निर्देश',
       call: 'कॉल',
-      message: 'संदेश',
-      video: 'वीडियो कॉल',
+      website: 'वेबसाइट',
+      viewDetails: 'विवरण देखें',
       backToResults: 'परिणामों पर वापस',
-      noProviders: 'आपके क्षेत्र में कोई प्रदाता नहीं मिला। अपनी खोज त्रिज्या बढ़ाने का प्रयास करें।',
-      detecting: 'आपका स्थान खोजा जा रहा है...'
+      noProviders: 'आपके क्षेत्र में कोई स्वास्थ्य प्रदाता नहीं मिला।',
+      detecting: 'आपका स्थान खोजा जा रहा है...',
+      kmAway: 'किमी दूर',
+      loadingMap: 'मैप लोड हो रहा है...',
+      mapError: 'मैप लोड करने में त्रुटि। कृपया पुन: प्रयास करें।',
+      searchError: 'प्रदाताओं की खोज में त्रुटि। कृपया पुन: प्रयास करें।',
+      noGoogleMapsKey: 'Google Maps API key कॉन्फ़िगर नहीं है। डेमो मोड दिखाया जा रहा है।'
     }
   };
 
@@ -191,15 +101,21 @@ const ProviderListing = ({ onNavigate }) => {
     return currentText[key] || text.en[key] || key;
   };
 
-  // Request location permission on component mount
+  // Initialize Google Maps Service
   useEffect(() => {
+    const service = new GoogleMapsService();
+    setMapsService(service);
+    
+    // Request location permission
     requestLocationPermission();
   }, []);
 
-  // Filter providers when location or filters change
+  // Search for providers when location or filters change
   useEffect(() => {
-    filterProviders();
-  }, [providers, userLocation, filters, radiusKm]);
+    if (userLocation && mapsService) {
+      searchNearbyProviders();
+    }
+  }, [userLocation, filters, mapsService]);
 
   const requestLocationPermission = () => {
     if (navigator.geolocation) {
@@ -212,7 +128,6 @@ const ProviderListing = ({ onNavigate }) => {
           };
           setUserLocation(location);
           setLocationPermission('granted');
-          calculateDistances(location);
         },
         (error) => {
           console.error('Location error:', error);
@@ -225,97 +140,244 @@ const ProviderListing = ({ onNavigate }) => {
     }
   };
 
-  // Calculate distance between two coordinates using Haversine formula
-  const calculateDistance = (lat1, lng1, lat2, lng2) => {
+  const handleManualLocationSearch = async () => {
+    if (!manualLocation.trim() || !mapsService) return;
+    
+    setLoading(true);
+    try {
+      // Use Google Geocoding API to convert address to coordinates
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(manualLocation)}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`
+      );
+      const data = await response.json();
+      
+      if (data.results && data.results.length > 0) {
+        const location = {
+          lat: data.results[0].geometry.location.lat,
+          lng: data.results[0].geometry.location.lng
+        };
+        setUserLocation(location);
+        setLocationPermission('granted');
+      } else {
+        alert('Location not found. Please try a different address.');
+      }
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      alert('Error finding location. Please try again.');
+    }
+    setLoading(false);
+  };
+
+  const searchNearbyProviders = async () => {
+    if (!userLocation || !mapsService) return;
+    
+    setLoading(true);
+    try {
+      // Check if Google Maps API key is available
+      if (!import.meta.env.VITE_GOOGLE_MAPS_API_KEY) {
+        console.warn('Google Maps API key not found. Using demo data.');
+        setProviders(getDemoProviders());
+        setFilteredProviders(getDemoProviders());
+        setLoading(false);
+        return;
+      }
+
+      // Initialize map if not already done and in map view
+      if (!mapLoaded && viewMode === 'map') {
+        await mapsService.initializeMap('map-container', userLocation);
+        setMapLoaded(true);
+      }
+
+      // Search for nearby providers using Google Places API
+      const results = await mapsService.findNearbyHealthcareProviders(
+        userLocation,
+        filters.radius,
+        filters.type
+      );
+
+      // Calculate distances and add additional info
+      const providersWithDistance = results.map(provider => ({
+        ...provider,
+        distance: calculateDistance(userLocation, provider.location),
+        phone: null, // Will be fetched with getPlaceDetails if needed
+        website: null,
+        openingHours: null
+      }));
+
+      // Apply filters
+      let filtered = [...providersWithDistance];
+      
+      if (filters.rating !== 'all') {
+        const minRating = parseFloat(filters.rating);
+        filtered = filtered.filter(provider => provider.rating >= minRating);
+      }
+
+      if (filters.openNow) {
+        filtered = filtered.filter(provider => provider.isOpen === true);
+      }
+
+      // Sort by distance
+      filtered.sort((a, b) => a.distance - b.distance);
+
+      setProviders(providersWithDistance);
+      setFilteredProviders(filtered);
+
+      // Add markers to map if in map view
+      if (mapLoaded && viewMode === 'map' && mapsService.addMarkersToMap) {
+        mapsService.addMarkersToMap(filtered, userLocation);
+      }
+
+    } catch (error) {
+      console.error('Error searching providers:', error);
+      alert(getText('searchError'));
+      // Fallback to demo data
+      const demoData = getDemoProviders();
+      setProviders(demoData);
+      setFilteredProviders(demoData);
+    }
+    setLoading(false);
+  };
+
+  // Calculate distance between two coordinates
+  const calculateDistance = (point1, point2) => {
     const R = 6371; // Earth's radius in kilometers
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const dLat = (point2.lat - point1.lat) * Math.PI / 180;
+    const dLng = (point2.lng - point1.lng) * Math.PI / 180;
     const a = 
       Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.cos(point1.lat * Math.PI / 180) * Math.cos(point2.lat * Math.PI / 180) * 
       Math.sin(dLng/2) * Math.sin(dLng/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
   };
 
-  const calculateDistances = (userLoc) => {
-    const providersWithDistance = mockProviders.map(provider => ({
-      ...provider,
-      distance: calculateDistance(
-        userLoc.lat, 
-        userLoc.lng, 
-        provider.coordinates.lat, 
-        provider.coordinates.lng
-      )
-    }));
+  // Demo data fallback when Google Maps API is not available
+  const getDemoProviders = () => [
+    {
+      id: 'demo1',
+      name: 'Apollo Hospital Demo',
+      address: 'Sector 26, Chandigarh',
+      location: { lat: 30.7333, lng: 76.7794 },
+      rating: 4.5,
+      totalRatings: 150,
+      distance: calculateDistance(userLocation || { lat: 30.7333, lng: 76.7794 }, { lat: 30.7333, lng: 76.7794 }),
+      isOpen: true,
+      types: ['hospital', 'health']
+    },
+    {
+      id: 'demo2',
+      name: 'Fortis Hospital Demo',
+      address: 'Sector 62, Mohali',
+      location: { lat: 30.7046, lng: 76.7179 },
+      rating: 4.7,
+      totalRatings: 230,
+      distance: calculateDistance(userLocation || { lat: 30.7333, lng: 76.7794 }, { lat: 30.7046, lng: 76.7179 }),
+      isOpen: true,
+      types: ['hospital', 'health']
+    },
+    {
+      id: 'demo3',
+      name: 'PGI Chandigarh Demo',
+      address: 'Sector 12, Chandigarh',
+      location: { lat: 30.7194, lng: 76.7646 },
+      rating: 4.8,
+      totalRatings: 500,
+      distance: calculateDistance(userLocation || { lat: 30.7333, lng: 76.7794 }, { lat: 30.7194, lng: 76.7646 }),
+      isOpen: true,
+      types: ['hospital', 'health']
+    }
+  ];
+
+  const handleViewModeChange = async (mode) => {
+    setViewMode(mode);
     
-    // Sort by distance
-    providersWithDistance.sort((a, b) => a.distance - b.distance);
-    setProviders(providersWithDistance);
+    if (mode === 'map' && !mapLoaded && mapsService && userLocation) {
+      try {
+        setLoading(true);
+        await mapsService.initializeMap('map-container', userLocation);
+        setMapLoaded(true);
+        
+        if (filteredProviders.length > 0 && mapsService.addMarkersToMap) {
+          mapsService.addMarkersToMap(filteredProviders, userLocation);
+        }
+      } catch (error) {
+        console.error('Error loading map:', error);
+        alert(getText('mapError'));
+      }
+      setLoading(false);
+    }
   };
 
-  const filterProviders = () => {
-    let filtered = [...providers];
+  const getDirections = (provider) => {
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${provider.location.lat},${provider.location.lng}&destination_place_id=${provider.placeId || ''}`;
+    window.open(url, '_blank');
+  };
 
-    // Filter by distance radius
-    if (userLocation) {
-      filtered = filtered.filter(provider => provider.distance <= radiusKm);
-    }
-
-    // Filter by specialty
-    if (filters.specialty !== 'all') {
-      filtered = filtered.filter(provider => 
-        provider.specialty.toLowerCase().includes(filters.specialty.toLowerCase())
-      );
-    }
-
-    // Filter by availability
-    if (filters.availability !== 'all') {
-      filtered = filtered.filter(provider => provider.availability === filters.availability);
-    }
-
-    // Filter by rating
-    if (filters.rating !== 'all') {
-      const minRating = parseFloat(filters.rating);
-      filtered = filtered.filter(provider => provider.rating >= minRating);
-    }
-
-    // Sort by distance if location available, otherwise by rating
-    if (userLocation) {
-      filtered.sort((a, b) => a.distance - b.distance);
+  const callProvider = async (provider) => {
+    // In real app, fetch phone number using getPlaceDetails
+    if (mapsService && provider.placeId && import.meta.env.VITE_GOOGLE_MAPS_API_KEY) {
+      try {
+        const details = await mapsService.getPlaceDetails(provider.placeId);
+        if (details.phone) {
+          window.open(`tel:${details.phone}`, '_self');
+        } else {
+          alert(`Phone number not available for ${provider.name}`);
+        }
+      } catch (error) {
+        alert(`Unable to get contact details for ${provider.name}`);
+      }
     } else {
-      filtered.sort((a, b) => b.rating - a.rating);
-    }
-
-    setFilteredProviders(filtered);
-  };
-
-  const handleManualLocationSearch = async () => {
-    if (manualLocation.trim()) {
-      // In a real app, you'd use Google Geocoding API here
-      // For demo, we'll use approximate coordinates for Chandigarh
-      const mockLocation = { lat: 30.7333, lng: 76.7794 };
-      setUserLocation(mockLocation);
-      calculateDistances(mockLocation);
-      setLocationPermission('granted');
+      alert(`Calling ${provider.name}. In real app with API key, phone number would be fetched from Google Places API.`);
     }
   };
 
-  const getAvailabilityColor = (status) => {
-    switch(status) {
-      case 'available': return '#4CAF50';
-      case 'busy': return '#FF9800';
-      case 'offline': return '#f44336';
-      default: return '#757575';
+  const openWebsite = async (provider) => {
+    if (mapsService && provider.placeId && import.meta.env.VITE_GOOGLE_MAPS_API_KEY) {
+      try {
+        const details = await mapsService.getPlaceDetails(provider.placeId);
+        if (details.website) {
+          window.open(details.website, '_blank');
+        } else {
+          alert(`Website not available for ${provider.name}`);
+        }
+      } catch (error) {
+        alert(`Unable to get website details for ${provider.name}`);
+      }
+    } else {
+      alert(`Opening website for ${provider.name}. In real app with API key, website would be fetched from Google Places API.`);
     }
   };
 
-  const getAvailabilityText = (status) => {
-    switch(status) {
-      case 'available': return getText('available');
-      case 'busy': return getText('busy');
-      case 'offline': return getText('offline');
-      default: return status;
+  const viewProviderDetails = async (provider) => {
+    if (mapsService && provider.placeId && import.meta.env.VITE_GOOGLE_MAPS_API_KEY) {
+      try {
+        setLoading(true);
+        const details = await mapsService.getPlaceDetails(provider.placeId);
+        
+        // Create a detailed info modal or alert
+        const detailsText = `
+${details.name}
+Address: ${details.address}
+Phone: ${details.phone || 'Not available'}
+Website: ${details.website || 'Not available'}
+Rating: ${details.rating || 'No rating'} (${details.totalRatings || 0} reviews)
+        `;
+        
+        alert(detailsText);
+      } catch (error) {
+        console.error('Error getting place details:', error);
+        alert(`Unable to get detailed information for ${provider.name}`);
+      }
+      setLoading(false);
+    } else {
+      const basicInfo = `
+${provider.name}
+Address: ${provider.address}
+Rating: ${provider.rating || 'No rating'} (${provider.totalRatings || 0} reviews)
+Distance: ${provider.distance?.toFixed(1)} km away
+Status: ${provider.isOpen ? 'Open Now' : 'Closed'}
+      `;
+      alert(basicInfo);
     }
   };
 
@@ -323,12 +385,12 @@ const ProviderListing = ({ onNavigate }) => {
     <div style={{
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      padding: '2rem',
+      padding: '1rem',
       fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
     }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
           <h1 style={{ 
             color: 'white', 
             fontSize: '2.5rem', 
@@ -337,6 +399,19 @@ const ProviderListing = ({ onNavigate }) => {
           }}>
             🏥 {getText('title')}
           </h1>
+          
+          {!import.meta.env.VITE_GOOGLE_MAPS_API_KEY && (
+            <div style={{
+              backgroundColor: 'rgba(255, 193, 7, 0.9)',
+              color: '#000',
+              padding: '0.8rem',
+              borderRadius: '8px',
+              marginBottom: '1rem',
+              fontSize: '0.9rem'
+            }}>
+              ⚠️ {getText('noGoogleMapsKey')}
+            </div>
+          )}
         </div>
 
         {/* Location Section */}
@@ -345,7 +420,7 @@ const ProviderListing = ({ onNavigate }) => {
           backdropFilter: 'blur(10px)',
           borderRadius: '15px',
           padding: '1.5rem',
-          marginBottom: '2rem',
+          marginBottom: '1.5rem',
           color: 'white'
         }}>
           {locationPermission === 'requesting' && (
@@ -357,32 +432,18 @@ const ProviderListing = ({ onNavigate }) => {
 
           {locationPermission === 'granted' && userLocation && (
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>📍 {getText('locationDetected')}</div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', marginTop: '1rem' }}>
-                <label>{getText('radiusLabel')}</label>
-                <select 
-                  value={radiusKm}
-                  onChange={(e) => setRadiusKm(parseInt(e.target.value))}
-                  style={{
-                    padding: '0.5rem',
-                    borderRadius: '5px',
-                    border: 'none',
-                    backgroundColor: 'rgba(255, 255, 255, 0.9)'
-                  }}
-                >
-                  <option value={5}>5 {getText('km')}</option>
-                  <option value={10}>10 {getText('km')}</option>
-                  <option value={20}>20 {getText('km')}</option>
-                  <option value={50}>50 {getText('km')}</option>
-                </select>
+              <div style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>
+                📍 {getText('locationDetected')}
               </div>
             </div>
           )}
 
           {locationPermission === 'denied' && (
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>📍 {getText('locationDenied')}</div>
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', alignItems: 'center' }}>
+              <div style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>
+                📍 {getText('locationDenied')}
+              </div>
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
                 <input
                   type="text"
                   placeholder={getText('enterLocation')}
@@ -392,262 +453,348 @@ const ProviderListing = ({ onNavigate }) => {
                     padding: '0.8rem',
                     borderRadius: '8px',
                     border: 'none',
-                    minWidth: '200px'
+                    minWidth: '250px'
+                  }}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleManualLocationSearch();
+                    }
                   }}
                 />
                 <button
                   onClick={handleManualLocationSearch}
+                  disabled={loading}
                   style={{
                     padding: '0.8rem 1.5rem',
                     borderRadius: '8px',
                     border: 'none',
                     backgroundColor: '#4CAF50',
                     color: 'white',
-                    cursor: 'pointer',
-                    fontWeight: 'bold'
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    fontWeight: 'bold',
+                    opacity: loading ? 0.7 : 1
                   }}
                 >
-                  {getText('searchLocation')}
+                  {loading ? '...' : getText('searchLocation')}
                 </button>
               </div>
             </div>
           )}
         </div>
 
-        {/* Filters */}
-        <div style={{
-          backgroundColor: 'rgba(255, 255, 255, 0.15)',
-          backdropFilter: 'blur(10px)',
-          borderRadius: '15px',
-          padding: '1.5rem',
-          marginBottom: '2rem',
-          color: 'white'
-        }}>
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-            gap: '1rem' 
+        {/* Filters and View Toggle */}
+        {userLocation && (
+          <div style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.15)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '15px',
+            padding: '1.5rem',
+            marginBottom: '1.5rem',
+            color: 'white'
           }}>
-            {/* Specialty Filter */}
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
-                {getText('filterBySpecialty')}
-              </label>
-              <select
-                value={filters.specialty}
-                onChange={(e) => setFilters(prev => ({ ...prev, specialty: e.target.value }))}
+            {/* View Toggle */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+              <button
+                onClick={() => handleViewModeChange('list')}
                 style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  borderRadius: '5px',
+                  padding: '0.8rem 1.5rem',
+                  borderRadius: '25px',
                   border: 'none',
-                  backgroundColor: 'rgba(255, 255, 255, 0.9)'
+                  backgroundColor: viewMode === 'list' ? '#4CAF50' : 'rgba(255, 255, 255, 0.3)',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
                 }}
               >
-                <option value="all">{getText('allSpecialties')}</option>
-                <option value="general">General Physician</option>
-                <option value="cardiology">Cardiology</option>
-                <option value="pediatrics">Pediatrics</option>
-                <option value="dermatology">Dermatology</option>
-                <option value="orthopedics">Orthopedics</option>
-                <option value="gynecology">Gynecology</option>
-              </select>
+                📋 {getText('listView')}
+              </button>
+              <button
+                onClick={() => handleViewModeChange('map')}
+                style={{
+                  padding: '0.8rem 1.5rem',
+                  borderRadius: '25px',
+                  border: 'none',
+                  backgroundColor: viewMode === 'map' ? '#4CAF50' : 'rgba(255, 255, 255, 0.3)',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                🗺️ {getText('mapView')}
+              </button>
             </div>
 
-            {/* Availability Filter */}
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
-                {getText('filterByAvailability')}
-              </label>
-              <select
-                value={filters.availability}
-                onChange={(e) => setFilters(prev => ({ ...prev, availability: e.target.value }))}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  borderRadius: '5px',
-                  border: 'none',
-                  backgroundColor: 'rgba(255, 255, 255, 0.9)'
-                }}
-              >
-                <option value="all">{getText('allAvailability')}</option>
-                <option value="available">{getText('available')}</option>
-                <option value="busy">{getText('busy')}</option>
-              </select>
-            </div>
+            {/* Filters */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+              gap: '1rem' 
+            }}>
+              {/* Type Filter */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                  {getText('filterByType')}
+                </label>
+                <select
+                  value={filters.type}
+                  onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    borderRadius: '5px',
+                    border: 'none',
+                    backgroundColor: 'rgba(255, 255, 255, 0.9)'
+                  }}
+                >
+                  <option value="hospital">{getText('hospital')}</option>
+                  <option value="doctor">{getText('doctor')}</option>
+                  <option value="pharmacy">{getText('pharmacy')}</option>
+                  <option value="dentist">{getText('dentist')}</option>
+                  <option value="physiotherapist">{getText('physiotherapist')}</option>
+                </select>
+              </div>
 
-            {/* Rating Filter */}
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
-                {getText('filterByRating')}
-              </label>
-              <select
-                value={filters.rating}
-                onChange={(e) => setFilters(prev => ({ ...prev, rating: e.target.value }))}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  borderRadius: '5px',
-                  border: 'none',
-                  backgroundColor: 'rgba(255, 255, 255, 0.9)'
-                }}
-              >
-                <option value="all">{getText('allRatings')}</option>
-                <option value="4.5">4.5+ Stars</option>
-                <option value="4.0">4.0+ Stars</option>
-                <option value="3.5">3.5+ Stars</option>
-              </select>
+              {/* Radius Filter */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                  {getText('filterByRadius')}
+                </label>
+                <select
+                  value={filters.radius}
+                  onChange={(e) => setFilters(prev => ({ ...prev, radius: parseInt(e.target.value) }))}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    borderRadius: '5px',
+                    border: 'none',
+                    backgroundColor: 'rgba(255, 255, 255, 0.9)'
+                  }}
+                >
+                  <option value={2000}>2 km</option>
+                  <option value={5000}>5 km</option>
+                  <option value={10000}>10 km</option>
+                  <option value={20000}>20 km</option>
+                  <option value={50000}>50 km</option>
+                </select>
+              </div>
+
+              {/* Rating Filter */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+                  {getText('filterByRating')}
+                </label>
+                <select
+                  value={filters.rating}
+                  onChange={(e) => setFilters(prev => ({ ...prev, rating: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    borderRadius: '5px',
+                    border: 'none',
+                    backgroundColor: 'rgba(255, 255, 255, 0.9)'
+                  }}
+                >
+                  <option value="all">All Ratings</option>
+                  <option value="4.0">4.0+ Stars</option>
+                  <option value="4.5">4.5+ Stars</option>
+                </select>
+              </div>
+
+              {/* Open Now Filter */}
+              <div>
+                <label style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.5rem',
+                  cursor: 'pointer',
+                  marginTop: '1.5rem'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={filters.openNow}
+                    onChange={(e) => setFilters(prev => ({ ...prev, openNow: e.target.checked }))}
+                    style={{ transform: 'scale(1.2)' }}
+                  />
+                  <span style={{ fontWeight: 'bold' }}>{getText('openNowOnly')}</span>
+                </label>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Providers Grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-          gap: '1.5rem',
-          marginBottom: '2rem'
-        }}>
-          {filteredProviders.length === 0 ? (
-            <div style={{
-              gridColumn: '1 / -1',
-              textAlign: 'center',
-              color: 'white',
-              padding: '3rem',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              borderRadius: '15px'
-            }}>
-              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔍</div>
-              <p style={{ fontSize: '1.2rem' }}>{getText('noProviders')}</p>
-            </div>
-          ) : (
-            filteredProviders.map(provider => (
-              <div
-                key={provider.id}
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                  borderRadius: '15px',
-                  padding: '1.5rem',
-                  color: '#333',
-                  transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-                  cursor: 'pointer'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.transform = 'translateY(-5px)';
-                  e.target.style.boxShadow = '0 10px 25px rgba(0,0,0,0.2)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.transform = 'translateY(0)';
-                  e.target.style.boxShadow = 'none';
-                }}
-              >
-                {/* Provider Header */}
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem' }}>
-                  <div style={{ fontSize: '3rem', marginRight: '1rem' }}>
-                    {provider.photo}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <h3 style={{ margin: '0 0 0.25rem 0', fontSize: '1.2rem' }}>
-                      {provider.name}
-                    </h3>
-                    <p style={{ margin: '0', color: '#666', fontSize: '0.9rem' }}>
-                      {provider.specialty}
-                    </p>
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '1rem', 
-                      marginTop: '0.5rem' 
-                    }}>
-                      <span style={{ fontSize: '0.8rem', color: '#666' }}>
-                        {provider.experience} {getText('years')} {getText('experience')}
-                      </span>
-                      <div style={{
-                        backgroundColor: getAvailabilityColor(provider.availability),
-                        color: 'white',
-                        padding: '0.2rem 0.5rem',
-                        borderRadius: '10px',
-                        fontSize: '0.7rem',
-                        fontWeight: 'bold'
-                      }}>
-                        {getAvailabilityText(provider.availability)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+        {/* Loading */}
+        {loading && (
+          <div style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.15)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '15px',
+            padding: '2rem',
+            textAlign: 'center',
+            color: 'white',
+            marginBottom: '1.5rem'
+          }}>
+            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🔄</div>
+            <p>{getText('loadingProviders')}</p>
+          </div>
+        )}
 
-                {/* Provider Details */}
-                <div style={{ marginBottom: '1rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <span style={{ fontSize: '0.9rem', color: '#666' }}>
-                      🏥 {provider.hospital}
-                    </span>
-                    {userLocation && (
-                      <span style={{ fontSize: '0.9rem', color: '#666' }}>
-                        📍 {provider.distance.toFixed(1)} {getText('km')}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.5rem' }}>
-                    📍 {provider.location}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{ color: '#FFD700' }}>⭐</span>
-                      <span>{provider.rating} {getText('rating')}</span>
+        {/* Content Area */}
+        {userLocation && !loading && (
+          <>
+            {viewMode === 'map' ? (
+              <div style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                borderRadius: '15px',
+                padding: '1rem',
+                marginBottom: '1.5rem',
+                height: '500px'
+              }}>
+                <div 
+                  id="map-container" 
+                  style={{ 
+                    width: '100%', 
+                    height: '100%', 
+                    borderRadius: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#f0f0f0'
+                  }}
+                >
+                  {!mapLoaded && (
+                    <div style={{ textAlign: 'center', color: '#666' }}>
+                      <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🗺️</div>
+                      <p>{getText('loadingMap')}</p>
                     </div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>
-                      ₹{provider.consultationFee}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.5rem' }}>
-                    ⏰ {getText('nextSlot')}: {provider.nextSlot}
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, 1fr)',
-                  gap: '0.5rem'
-                }}>
-                  <Button
-                    onClick={() => console.log('Book appointment:', provider.name)}
-                    variant="primary"
-                    size="small"
-                    style={{ fontSize: '0.8rem' }}
-                  >
-                    📅 {getText('book')}
-                  </Button>
-                  <Button
-                    onClick={() => console.log('Call:', provider.name)}
-                    variant="secondary"
-                    size="small"
-                    style={{ fontSize: '0.8rem' }}
-                  >
-                    📞 {getText('call')}
-                  </Button>
-                  <Button
-                    onClick={() => console.log('Message:', provider.name)}
-                    variant="outline"
-                    size="small"
-                    style={{ fontSize: '0.8rem' }}
-                  >
-                    💬 {getText('message')}
-                  </Button>
-                  <Button
-                    onClick={() => console.log('Video call:', provider.name)}
-                    variant="secondary"
-                    size="small"
-                    style={{ fontSize: '0.8rem' }}
-                  >
-                    📹 {getText('video')}
-                  </Button>
+                  )}
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            ) : (
+              /* Providers List */
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+                gap: '1.5rem',
+                marginBottom: '2rem'
+              }}>
+                {filteredProviders.length === 0 ? (
+                  <div style={{
+                    gridColumn: '1 / -1',
+                    textAlign: 'center',
+                    color: 'white',
+                    padding: '3rem',
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    borderRadius: '15px'
+                  }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔍</div>
+                    <p style={{ fontSize: '1.2rem' }}>{getText('noProviders')}</p>
+                  </div>
+                ) : (
+                  filteredProviders.map(provider => (
+                    <div
+                      key={provider.id}
+                      style={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        borderRadius: '15px',
+                        padding: '1.5rem',
+                        color: '#333',
+                        transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-5px)';
+                        e.currentTarget.style.boxShadow = '0 10px 25px rgba(0,0,0,0.2)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    >
+                      {/* Provider Header */}
+                      <div style={{ marginBottom: '1rem' }}>
+                        <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.3rem', fontWeight: 'bold' }}>
+                          🏥 {provider.name}
+                        </h3>
+                        <p style={{ margin: '0', color: '#666', fontSize: '0.9rem' }}>
+                          📍 {provider.address}
+                        </p>
+                        {provider.distance && (
+                          <p style={{ margin: '0.25rem 0 0 0', color: '#666', fontSize: '0.8rem' }}>
+                            📏 {provider.distance.toFixed(1)} {getText('kmAway')}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Provider Details */}
+                      <div style={{ marginBottom: '1rem' }}>
+                        {provider.rating > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                            <span style={{ color: '#FFD700' }}>⭐</span>
+                            <span>{provider.rating.toFixed(1)} ({provider.totalRatings} {getText('reviews')})</span>
+                          </div>
+                        )}
+                        
+                        {provider.isOpen !== undefined && (
+                          <div style={{ 
+                            display: 'inline-block',
+                            backgroundColor: provider.isOpen ? '#4CAF50' : '#f44336',
+                            color: 'white',
+                            padding: '0.2rem 0.8rem',
+                            borderRadius: '15px',
+                            fontSize: '0.8rem',
+                            fontWeight: 'bold'
+                          }}>
+                            {provider.isOpen ? getText('openNow') : getText('closed')}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(2, 1fr)',
+                        gap: '0.5rem'
+                      }}>
+                        <Button
+                          onClick={() => getDirections(provider)}
+                          variant="primary"
+                          size="small"
+                          style={{ fontSize: '0.8rem' }}
+                        >
+                          🧭 {getText('getDirections')}
+                        </Button>
+                        <Button
+                          onClick={() => callProvider(provider)}
+                          variant="secondary"
+                          size="small"
+                          style={{ fontSize: '0.8rem' }}
+                        >
+                          📞 {getText('call')}
+                        </Button>
+                        <Button
+                          onClick={() => openWebsite(provider)}
+                          variant="outline"
+                          size="small"
+                          style={{ fontSize: '0.8rem' }}
+                        >
+                          🌐 {getText('website')}
+                        </Button>
+                        <Button
+                          onClick={() => viewProviderDetails(provider)}
+                          variant="outline"
+                          size="small"
+                          style={{ fontSize: '0.8rem' }}
+                        >
+                          📋 {getText('viewDetails')}
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </>
+        )}
 
         {/* Back Button */}
         <div style={{ textAlign: 'center' }}>
