@@ -168,75 +168,71 @@ const ProviderListing = ({ onNavigate }) => {
     setLoading(false);
   };
 
-  const searchNearbyProviders = async () => {
-    if (!userLocation || !mapsService) return;
-    
-    setLoading(true);
-    try {
-      // Check if Google Maps API key is available
-      if (!import.meta.env.VITE_GOOGLE_MAPS_API_KEY) {
-        console.warn('Google Maps API key not found. Using demo data.');
-        setProviders(getDemoProviders());
-        setFilteredProviders(getDemoProviders());
-        setLoading(false);
-        return;
-      }
+const searchNearbyProviders = async () => {
+  if (!userLocation) return;
 
-      // Initialize map if not already done and in map view
-      if (!mapLoaded && viewMode === 'map') {
-        await mapsService.initializeMap('map-container', userLocation);
-        setMapLoaded(true);
-      }
+  setLoading(true);
+  try {
+    // Construct Overpass query
+    const query = `
+      [out:json];
+      (
+        node["amenity"~"hospital|clinic|doctors|pharmacy|dentist|nursing_home"](around:${filters.radius},${userLocation.lat},${userLocation.lng});
+        way["amenity"~"hospital|clinic|doctors|pharmacy|dentist|nursing_home"](around:${filters.radius},${userLocation.lat},${userLocation.lng});
+        relation["amenity"~"hospital|clinic|doctors|pharmacy|dentist|nursing_home"](around:${filters.radius},${userLocation.lat},${userLocation.lng});
 
-      // Search for nearby providers using Google Places API
-      const results = await mapsService.findNearbyHealthcareProviders(
-        userLocation,
-        filters.radius,
-        filters.type
+        node["healthcare"](around:${filters.radius},${userLocation.lat},${userLocation.lng});
+        way["healthcare"](around:${filters.radius},${userLocation.lat},${userLocation.lng});
+        relation["healthcare"](around:${filters.radius},${userLocation.lat},${userLocation.lng});
       );
+      out center;
+    `;
 
-      // Calculate distances and add additional info
-      const providersWithDistance = results.map(provider => ({
-        ...provider,
-        distance: calculateDistance(userLocation, provider.location),
-        phone: null, // Will be fetched with getPlaceDetails if needed
-        website: null,
-        openingHours: null
-      }));
+    const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+    const response = await fetch(url);
+    const data = await response.json();
 
-      // Apply filters
-      let filtered = [...providersWithDistance];
-      
-      if (filters.rating !== 'all') {
-        const minRating = parseFloat(filters.rating);
-        filtered = filtered.filter(provider => provider.rating >= minRating);
-      }
+    const providersWithDistance = data.elements.map((el) => {
+      const latVal = el.lat || (el.center && el.center.lat);
+      const lonVal = el.lon || (el.center && el.center.lon);
+      if (!latVal || !lonVal) return null;
 
-      if (filters.openNow) {
-        filtered = filtered.filter(provider => provider.isOpen === true);
-      }
+      return {
+        id: el.id,
+        name: el.tags.name || 'Unnamed Health Center',
+        address: el.tags['addr:full'] || el.tags['addr:street'] || 'Address not available',
+        location: { lat: latVal, lng: lonVal },
+        type: el.tags.amenity || el.tags.healthcare || 'health',
+        distance: calculateDistance(userLocation, { lat: latVal, lng: lonVal }),
+        rating: 0, // Overpass doesn't provide ratings
+        totalRatings: 0,
+        isOpen: true // Placeholder
+      };
+    }).filter(Boolean);
 
-      // Sort by distance
-      filtered.sort((a, b) => a.distance - b.distance);
-
-      setProviders(providersWithDistance);
-      setFilteredProviders(filtered);
-
-      // Add markers to map if in map view
-      if (mapLoaded && viewMode === 'map' && mapsService.addMarkersToMap) {
-        mapsService.addMarkersToMap(filtered, userLocation);
-      }
-
-    } catch (error) {
-      console.error('Error searching providers:', error);
-      alert(getText('searchError'));
-      // Fallback to demo data
-      const demoData = getDemoProviders();
-      setProviders(demoData);
-      setFilteredProviders(demoData);
+    // Filter by type if needed
+    let filtered = providersWithDistance;
+    if (filters.type && filters.type !== 'all') {
+      filtered = filtered.filter(p => p.type.toLowerCase().includes(filters.type));
     }
-    setLoading(false);
-  };
+
+    // Sort by distance
+    filtered.sort((a, b) => a.distance - b.distance);
+
+    setProviders(providersWithDistance);
+    setFilteredProviders(filtered);
+
+  } catch (error) {
+    console.error('Error fetching providers from Overpass:', error);
+    alert(getText('searchError'));
+    const demoData = getDemoProviders();
+    setProviders(demoData);
+    setFilteredProviders(demoData);
+  }
+
+  setLoading(false);
+};
+
 
   // Calculate distance between two coordinates
   const calculateDistance = (point1, point2) => {
