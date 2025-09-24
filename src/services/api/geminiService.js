@@ -13,8 +13,168 @@ class GeminiService {
     }
   }
 
+  // NEW: Emergency detection method
+  detectEmergency(patientData) {
+    const { symptoms, severity, duration, ageGroup, selectedSymptoms } = patientData;
+    
+    if (!symptoms) {
+      return { isEmergency: false, level: 'none', type: null };
+    }
+
+    const symptomsLower = symptoms.toLowerCase();
+    const severityNum = parseInt(severity) || 0;
+    
+    // Emergency keywords for different categories
+    const emergencyKeywords = {
+      cardiac: [
+        'chest pain', 'heart attack', 'crushing chest pain', 'severe chest pain',
+        'chest pressure', 'heart racing', 'chest tightness'
+      ],
+      respiratory: [
+        'can\'t breathe', 'difficulty breathing', 'shortness of breath',
+        'choking', 'gasping', 'respiratory distress', 'suffocating'
+      ],
+      neurological: [
+        'stroke', 'severe headache', 'sudden confusion', 'paralysis',
+        'facial drooping', 'speech problems', 'vision loss', 'seizure'
+      ],
+      trauma: [
+        'severe bleeding', 'heavy bleeding', 'major injury', 'unconscious',
+        'broken bone', 'head injury', 'accident'
+      ],
+      allergic: [
+        'allergic reaction', 'anaphylaxis', 'swelling throat', 'swelling tongue',
+        'severe allergic', 'throat closing'
+      ]
+    };
+
+    // Check for immediate emergency keywords
+    for (const [type, keywords] of Object.entries(emergencyKeywords)) {
+      for (const keyword of keywords) {
+        if (symptomsLower.includes(keyword)) {
+          return {
+            isEmergency: true,
+            level: 'critical',
+            type: type,
+            reason: `Critical symptoms detected: ${keyword}`,
+            confidence: 0.95
+          };
+        }
+      }
+    }
+
+    // Check critical symptom combinations
+    const criticalCombinations = [
+      ['chest pain', 'shortness of breath'],
+      ['chest pain', 'nausea'],
+      ['severe headache', 'confusion'],
+      ['difficulty breathing', 'chest pain'],
+      ['swelling', 'throat'],
+      ['severe bleeding', 'weakness']
+    ];
+
+    for (const combination of criticalCombinations) {
+      if (combination.every(symptom => symptomsLower.includes(symptom))) {
+        return {
+          isEmergency: true,
+          level: 'high',
+          type: 'combination',
+          reason: 'Critical symptom combination detected',
+          confidence: 0.90
+        };
+      }
+    }
+
+    // Check severity-based emergency
+    if (severityNum >= 9) {
+      return {
+        isEmergency: true,
+        level: 'critical',
+        type: 'high_severity',
+        reason: 'Extremely high severity level (9-10/10)',
+        confidence: 0.85
+      };
+    }
+
+    // Age-based severity thresholds
+    const ageThresholds = {
+      '18-30': 8,
+      '31-50': 7,
+      '51-65': 6,
+      '65+': 6
+    };
+
+    const threshold = ageThresholds[ageGroup] || 7;
+    if (severityNum >= threshold) {
+      const concerningSymptoms = ['chest pain', 'breathing', 'headache', 'dizziness'];
+      const hasConcerningSymptom = concerningSymptoms.some(symptom => 
+        symptomsLower.includes(symptom)
+      );
+
+      if (hasConcerningSymptom) {
+        return {
+          isEmergency: true,
+          level: 'high',
+          type: 'age_severity',
+          reason: `High severity with concerning symptoms for age group`,
+          confidence: 0.80
+        };
+      }
+    }
+
+    // Check selected emergency symptoms
+    const emergencySymptomIds = ['chest-pain', 'breathing', 'severe-headache'];
+    const hasEmergencySymptom = selectedSymptoms?.some(symptom => 
+      emergencySymptomIds.includes(symptom)
+    );
+
+    if (hasEmergencySymptom && severityNum >= 7) {
+      return {
+        isEmergency: true,
+        level: 'moderate',
+        type: 'selected_symptoms',
+        reason: 'High severity with emergency symptom categories',
+        confidence: 0.75
+      };
+    }
+
+    return { isEmergency: false, level: 'none', type: null };
+  }
+
   async analyzeSymptoms(patientData) {
-    // If no API key, return mock data
+    // Check for emergency first
+    const emergencyCheck = this.detectEmergency(patientData);
+    if (emergencyCheck.isEmergency) {
+      return {
+        isEmergency: true,
+        emergencyData: emergencyCheck,
+        urgencyLevel: 'emergency',
+        possibleConditions: [
+          {
+            condition: 'EMERGENCY SITUATION DETECTED',
+            probability: emergencyCheck.confidence * 100,
+            description: emergencyCheck.reason
+          }
+        ],
+        recommendations: [
+          {
+            action: 'Call emergency services immediately',
+            priority: 'critical'
+          },
+          {
+            action: 'Do not delay seeking professional medical help',
+            priority: 'critical'
+          }
+        ],
+        whenToSeekHelp: [
+          'Immediately - this is a potential emergency',
+          'Call 911 (US) or 108 (India) now'
+        ],
+        disclaimer: 'EMERGENCY DETECTED: Seek immediate professional medical attention.'
+      };
+    }
+
+    // If no emergency, continue with normal analysis
     if (!this.apiKey) {
       return this.getMockResponse(patientData);
     }
@@ -63,7 +223,13 @@ class GeminiService {
       );
 
       const aiResponse = response.data.candidates[0].content.parts[0].text;
-      return this.parseAIResponse(aiResponse);
+      const parsedResponse = this.parseAIResponse(aiResponse);
+      
+      // Add emergency flag to normal responses
+      return {
+        ...parsedResponse,
+        isEmergency: false
+      };
 
     } catch (error) {
       console.error('Gemini API Error:', error);
@@ -78,11 +244,15 @@ class GeminiService {
       }
       
       // Fallback to mock response on API failure
-      return this.getMockResponse(patientData);
+      const mockResponse = this.getMockResponse(patientData);
+      return {
+        ...mockResponse,
+        isEmergency: false
+      };
     }
   }
 
-  // NEW: Chat functionality for follow-up questions
+  // Chat functionality for follow-up questions
   async getChatResponse(userMessage, context = {}) {
     if (!this.apiKey) {
       console.log('Gemini API key not found. Using mock chat response.');
@@ -198,7 +368,7 @@ Consider these factors in your analysis:
 Provide helpful, accurate information while emphasizing the need for professional medical consultation. Return only valid JSON without any additional formatting or text.`;
   }
 
-  // NEW: Build chat prompt for follow-up questions
+  // Build chat prompt for follow-up questions
   buildChatPrompt(userMessage, context) {
     const contextInfo = context.symptoms ? `
 Previous Analysis Context:
@@ -350,7 +520,7 @@ Remember: This is for informational purposes only and should not replace profess
     };
   }
 
-  // NEW: Mock chat responses for when API is unavailable
+  // Mock chat responses for when API is unavailable
   getMockChatResponse(userMessage) {
     const message = userMessage.toLowerCase();
     

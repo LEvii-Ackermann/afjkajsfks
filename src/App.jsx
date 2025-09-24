@@ -8,8 +8,9 @@ import SymptomInput from './pages/SymptomInput';
 import AnalysisLoading from './pages/AnalysisLoading';
 import ResultsPage from './pages/ResultsPage';
 import ProviderListing from './pages/ProviderListing';
-import './App.css';
+import EmergencyTriage from './pages/EmergencyTriage';
 import ChatInterface from './components/chat/ChatInterface.jsx';
+import './App.css';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('landing');
@@ -21,7 +22,10 @@ function App() {
     symptoms: '',
     severity: 1,
     duration: '',
-    selectedSymptoms: []
+    selectedSymptoms: [],
+    emergencyDetected: false,
+    emergencyType: null,
+    emergencyConfidence: 0
   });
 
   const navigateTo = (page) => {
@@ -39,10 +43,10 @@ function App() {
     switch(currentPage) {
       case 'landing':
         return <LandingPage onNavigate={navigateTo} />;
-        
+
       case 'language-selection':
         return <LanguageSelection onNavigate={navigateTo} />;
-        
+
       case 'basic-info':
         return (
           <BasicInformation 
@@ -51,7 +55,7 @@ function App() {
             updatePatientData={updatePatientData}
           />
         );
-        
+
       case 'symptom-input':
         return (
           <SymptomInput 
@@ -60,7 +64,15 @@ function App() {
             updatePatientData={updatePatientData}
           />
         );
-        
+
+      case 'emergency-triage':
+        return (
+          <EmergencyTriage 
+            onNavigate={navigateTo}
+            patientData={patientData}
+          />
+        );
+
       case 'analysis-loading':
         return (
           <AnalysisLoading 
@@ -68,16 +80,16 @@ function App() {
             patientData={patientData}
           />
         );
-        
+
       case 'results':
         return <ResultsPage onNavigate={navigateTo} />;
 
       case 'chat':
         return <ChatInterface onNavigate={navigateTo} />;    
-        
+
       case 'provider-listing':
         return <ProviderListing onNavigate={navigateTo} />;
-        
+
       case 'follow-up-chat':
         return (
           <div style={{
@@ -114,7 +126,7 @@ function App() {
             </button>
           </div>
         );
-        
+
       default:
         return <LandingPage onNavigate={navigateTo} />;
     }

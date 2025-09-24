@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import Button from '../components/common/Button';
 import VoiceRecorder from '../components/symptom/VoiceRecorder';
+import geminiService from '../services/api/geminiService';
 
 const SymptomInput = ({ onNavigate, patientData, updatePatientData }) => {
   const { getCurrentLanguage } = useLanguage();
@@ -13,6 +14,11 @@ const SymptomInput = ({ onNavigate, patientData, updatePatientData }) => {
   const [severity, setSeverity] = useState(patientData?.severity || 5);
   const [duration, setDuration] = useState(patientData?.duration || '');
   const [isRecording, setIsRecording] = useState(false);
+  const [emergencyDetected, setEmergencyDetected] = useState(null);
+  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+
+  // Emergency detection timeout
+  const emergencyTimeoutRef = useRef(null);
 
   // Multilingual content
   const content = {
@@ -61,7 +67,15 @@ const SymptomInput = ({ onNavigate, patientData, updatePatientData }) => {
       },
       analyze: "Analyze Symptoms",
       back: "← Back",
-      emergency: "🚨 If this is an emergency, call 108 immediately"
+      emergency: "🚨 If this is an emergency, call 108 immediately",
+      emergencyModal: {
+        title: "⚠️ POTENTIAL EMERGENCY DETECTED",
+        subtitle: "Your symptoms may require immediate medical attention",
+        callEmergency: "🚨 Call Emergency Services",
+        continueAnalysis: "Continue with Analysis",
+        goToEmergency: "Emergency Guidance",
+        description: "Based on your symptoms, this may be a medical emergency. Consider seeking immediate professional medical help."
+      }
     },
     hi: {
       title: "अपने लक्षणों का वर्णन करें",
@@ -108,11 +122,70 @@ const SymptomInput = ({ onNavigate, patientData, updatePatientData }) => {
       },
       analyze: "लक्षणों का विश्लेषण करें",
       back: "← वापस",
-      emergency: "🚨 यदि यह आपातकाल है, तो तुरंत 108 पर कॉल करें"
+      emergency: "🚨 यदि यह आपातकाल है, तो तुरंत 108 पर कॉल करें",
+      emergencyModal: {
+        title: "⚠️ संभावित आपातकाल का पता चला",
+        subtitle: "आपके लक्षणों के लिए तत्काल चिकित्सा सहायता की आवश्यकता हो सकती है",
+        callEmergency: "🚨 आपातकालीन सेवाओं को कॉल करें",
+        continueAnalysis: "विश्लेषण जारी रखें",
+        goToEmergency: "आपातकालीन मार्गदर्शन",
+        description: "आपके लक्षणों के आधार पर, यह एक चिकित्सा आपातकाल हो सकता है। तत्काल पेशेवर चिकित्सा सहायता लेने पर विचार करें।"
+      }
     }
   };
 
   const currentContent = content[currentLang?.code] || content.en;
+
+  // Emergency detection effect
+  useEffect(() => {
+    const checkForEmergency = async () => {
+      if (symptomText.trim() || selectedSymptoms.length > 0) {
+        // Clear previous timeout
+        if (emergencyTimeoutRef.current) {
+          clearTimeout(emergencyTimeoutRef.current);
+        }
+
+        // Set new timeout for 2 seconds after user stops typing
+        emergencyTimeoutRef.current = setTimeout(async () => {
+          const allSymptoms = [
+            symptomText,
+            ...selectedSymptoms.map(id => {
+              const symptom = currentContent.commonSymptoms.symptoms.find(s => s.id === id);
+              return symptom?.name || id;
+            })
+          ].filter(Boolean).join(', ');
+
+          if (allSymptoms.trim()) {
+            try {
+              const emergency = geminiService.detectEmergency({
+                symptoms: allSymptoms,
+                severity: severity,
+                duration: duration,
+                ageGroup: patientData?.age,
+                selectedSymptoms: selectedSymptoms
+              });
+              
+              if (emergency.isEmergency && emergency.confidence > 0.7) {
+                setEmergencyDetected(emergency);
+                setShowEmergencyModal(true);
+              }
+            } catch (error) {
+              console.error('Emergency detection error:', error);
+            }
+          }
+        }, 2000);
+      }
+    };
+
+    checkForEmergency();
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (emergencyTimeoutRef.current) {
+        clearTimeout(emergencyTimeoutRef.current);
+      }
+    };
+  }, [symptomText, selectedSymptoms, severity, patientData?.age, currentContent]);
 
   // Handle symptom text change
   const handleSymptomTextChange = (text) => {
@@ -140,6 +213,27 @@ const SymptomInput = ({ onNavigate, patientData, updatePatientData }) => {
   const handleDurationChange = (newDuration) => {
     setDuration(newDuration);
     updatePatientData({ duration: newDuration });
+  };
+
+  // Handle emergency modal actions
+  const handleEmergencyCall = () => {
+    window.open('tel:108');
+    setShowEmergencyModal(false);
+  };
+
+  const handleEmergencyGuidance = () => {
+    // Store emergency data
+    updatePatientData({
+      emergencyDetected: true,
+      emergencyType: emergencyDetected.type,
+      emergencyConfidence: emergencyDetected.confidence
+    });
+    setShowEmergencyModal(false);
+    onNavigate('emergency-triage');
+  };
+
+  const handleContinueAnalysis = () => {
+    setShowEmergencyModal(false);
   };
 
   // Handle form submission
@@ -241,7 +335,7 @@ const SymptomInput = ({ onNavigate, patientData, updatePatientData }) => {
             />
           </div>
 
-          {/* Voice Input */}
+          {/* Voice Input - */}
           <div style={{ marginBottom: '2rem' }}>
             <label style={{ 
               display: 'block', 
@@ -251,10 +345,11 @@ const SymptomInput = ({ onNavigate, patientData, updatePatientData }) => {
             }}>
               {currentContent.voiceInput.label}
             </label>
-            <VoiceRecorder 
+            <VoiceRecorder
               onRecordingComplete={(audioBlob) => {
                 console.log('Voice recorded:', audioBlob);
                 updatePatientData({ voiceRecording: audioBlob });
+                // You can add speech-to-text conversion here if needed
               }}
               currentContent={currentContent.voiceInput}
             />
@@ -420,6 +515,95 @@ const SymptomInput = ({ onNavigate, patientData, updatePatientData }) => {
           </Button>
         </div>
       </div>
+
+      {/* Emergency Detection Modal */}
+      {showEmergencyModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #f44336, #d32f2f)',
+            padding: '2rem',
+            borderRadius: '15px',
+            maxWidth: '400px',
+            width: '100%',
+            textAlign: 'center',
+            color: 'white',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)'
+          }}>
+            <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>
+              {currentContent.emergencyModal.title}
+            </h2>
+            <p style={{ marginBottom: '1.5rem', opacity: 0.9 }}>
+              {currentContent.emergencyModal.subtitle}
+            </p>
+            <p style={{ marginBottom: '2rem', fontSize: '0.9rem', opacity: 0.8 }}>
+              {currentContent.emergencyModal.description}
+            </p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <button
+                onClick={handleEmergencyCall}
+                style={{
+                  background: '#fff',
+                  color: '#f44336',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '1rem',
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                {currentContent.emergencyModal.callEmergency}
+              </button>
+              
+              <button
+                onClick={handleEmergencyGuidance}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  border: '2px solid rgba(255, 255, 255, 0.5)',
+                  borderRadius: '8px',
+                  padding: '1rem',
+                  fontSize: '1rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                {currentContent.emergencyModal.goToEmergency}
+              </button>
+              
+              <button
+                onClick={handleContinueAnalysis}
+                style={{
+                  background: 'transparent',
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  border: 'none',
+                  padding: '0.5rem',
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                  textDecoration: 'underline'
+                }}
+              >
+                {currentContent.emergencyModal.continueAnalysis}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
