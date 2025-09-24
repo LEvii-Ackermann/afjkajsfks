@@ -376,31 +376,39 @@ const ResultsPage = ({ onNavigate }) => {
             🏥 {getText('findProviders')}
           </button>
           
-          <button
-            onClick={() => onNavigate('follow-up-chat')}
-            style={{
-              padding: '1.2rem',
-              borderRadius: '12px',
-              border: 'none',
-              backgroundColor: '#2196F3',
-              color: 'white',
-              fontSize: '1.1rem',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 4px 15px rgba(33, 150, 243, 0.3)'
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = '#1976D2';
-              e.target.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = '#2196F3';
-              e.target.style.transform = 'translateY(0px)';
-            }}
-          >
-            💬 {getText('getSecondOpinion')}
-          </button>
+       
+
+        <button
+          onClick={() => onNavigate('chat')}
+          style={{
+            background: 'linear-gradient(135deg, #2196F3, #1976D2)',
+            border: 'none',
+            borderRadius: '12px',
+            padding: '1rem 1.5rem',
+            color: 'white',
+            fontSize: '1rem',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem'
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.transform = 'translateY(-2px)';
+            e.target.style.boxShadow = '0 8px 25px rgba(33, 150, 243, 0.3)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.transform = 'translateY(0)';
+            e.target.style.boxShadow = 'none';
+          }}
+        >
+          <span style={{ fontSize: '1.2rem' }}>💬</span>
+          {getText('chatForInfo')}
+        </button>
+
+
         </div>
 
         {/* Navigation Controls */}

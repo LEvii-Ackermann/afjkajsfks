@@ -82,6 +82,65 @@ class GeminiService {
     }
   }
 
+  // NEW: Chat functionality for follow-up questions
+  async getChatResponse(userMessage, context = {}) {
+    if (!this.apiKey) {
+      console.log('Gemini API key not found. Using mock chat response.');
+      return this.getMockChatResponse(userMessage);
+    }
+
+    try {
+      const prompt = this.buildChatPrompt(userMessage, context);
+      
+      const response = await axios.post(
+        `${GEMINI_API_URL}?key=${this.apiKey}`,
+        {
+          contents: [{
+            parts: [{
+              text: prompt
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.4,
+            topK: 32,
+            topP: 1,
+            maxOutputTokens: 800,
+          },
+          safetySettings: [
+            {
+              category: "HARM_CATEGORY_HARASSMENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_HATE_SPEECH",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const aiResponse = response.data.candidates[0].content.parts[0].text;
+      return aiResponse.trim();
+
+    } catch (error) {
+      console.error('Gemini Chat Error:', error);
+      return this.getMockChatResponse(userMessage);
+    }
+  }
+
   buildMedicalPrompt(patientData) {
     const { symptoms, severity, duration, age, gender, location } = patientData;
     
@@ -137,6 +196,43 @@ Consider these factors in your analysis:
 5. Clear warning signs for when to seek immediate care
 
 Provide helpful, accurate information while emphasizing the need for professional medical consultation. Return only valid JSON without any additional formatting or text.`;
+  }
+
+  // NEW: Build chat prompt for follow-up questions
+  buildChatPrompt(userMessage, context) {
+    const contextInfo = context.symptoms ? `
+Previous Analysis Context:
+- Patient's reported symptoms: ${context.symptoms}
+- Severity level: ${context.severity}/10
+- Duration: ${context.duration}
+- Age group: ${context.age}
+- Previous analysis showed possible conditions: ${context.previousAnalysis?.map(c => c.condition).join(', ') || 'Not available'}
+` : '';
+
+    return `You are a helpful medical AI assistant providing follow-up support after a symptom analysis. 
+
+${contextInfo}
+
+User's Current Question: "${userMessage}"
+
+Please provide a helpful, medically responsible response that:
+- Addresses their specific question about their health analysis
+- Provides educational information when appropriate
+- Always emphasizes the importance of consulting healthcare professionals for medical decisions
+- Is supportive and empathetic
+- Keeps responses concise but informative (2-3 paragraphs maximum)
+- Avoids providing definitive medical diagnoses
+- References their previous analysis when relevant
+- Uses simple, understandable language
+
+IMPORTANT GUIDELINES:
+- Never recommend specific medications without professional consultation
+- Always encourage seeking professional medical advice for treatment decisions
+- Provide general health education and guidance
+- Be supportive but medically responsible
+- If asked about emergency symptoms, immediately recommend seeking urgent care
+
+Remember: This is for informational purposes only and should not replace professional medical consultation.`;
   }
 
   parseAIResponse(aiResponse) {
@@ -252,6 +348,37 @@ Provide helpful, accurate information while emphasizing the need for professiona
       ],
       disclaimer: 'AI analysis encountered an issue. Please consult a healthcare professional for proper medical advice.'
     };
+  }
+
+  // NEW: Mock chat responses for when API is unavailable
+  getMockChatResponse(userMessage) {
+    const message = userMessage.toLowerCase();
+    
+    if (message.includes('pain') || message.includes('hurt')) {
+      return "Pain management can involve rest, over-the-counter pain relievers (as appropriate for your age and health conditions), and avoiding activities that worsen the pain. However, if pain is severe, persistent, or accompanied by other concerning symptoms, it's important to consult with a healthcare professional for proper evaluation and treatment. They can assess your specific situation and recommend the most appropriate treatment plan.";
+    }
+    
+    if (message.includes('fever') || message.includes('temperature')) {
+      return "Fever is often your body's way of fighting infection. Stay hydrated, rest, and consider fever-reducing medication if appropriate for your situation. However, high fevers (over 103°F/39.4°C), persistent fevers, or fevers accompanied by severe symptoms require medical attention. Always consult a healthcare provider for guidance specific to your situation, especially if you have underlying health conditions.";
+    }
+    
+    if (message.includes('medication') || message.includes('medicine') || message.includes('drug')) {
+      return "I cannot recommend specific medications as this requires professional medical evaluation. The choice of medication depends on your specific condition, medical history, current medications, allergies, and other individual factors. Please consult with a healthcare provider or pharmacist who can properly assess your situation and recommend appropriate treatment options.";
+    }
+    
+    if (message.includes('emergency') || message.includes('urgent') || message.includes('serious')) {
+      return "If you're experiencing a medical emergency, please call your local emergency number immediately (911 in the US, 108 in India). Emergency signs include severe chest pain, difficulty breathing, severe bleeding, loss of consciousness, or severe allergic reactions. When in doubt about the severity of your condition, it's always better to seek immediate medical attention rather than wait.";
+    }
+
+    if (message.includes('when') && (message.includes('doctor') || message.includes('hospital'))) {
+      return "You should consider seeing a healthcare provider if your symptoms are worsening, persisting longer than expected, or if you're concerned about your condition. Specific situations that warrant medical attention include high fever, severe pain, difficulty breathing, persistent symptoms that interfere with daily activities, or any symptoms that worry you. Trust your instincts - if you feel something isn't right, it's worth getting checked by a professional.";
+    }
+
+    if (message.includes('how long') || message.includes('recovery') || message.includes('heal')) {
+      return "Recovery time varies greatly depending on the specific condition, your overall health, age, and how well you follow treatment recommendations. While some minor conditions may resolve in a few days, others might take weeks or require ongoing management. It's important to follow up with a healthcare provider if your symptoms persist beyond expected recovery times or if they worsen at any point during your recovery.";
+    }
+    
+    return "I understand your concern about your health. While I can provide general health information based on your previous analysis, every person's situation is unique. For personalized medical advice, proper diagnosis, and treatment recommendations, I strongly encourage you to consult with a qualified healthcare professional who can properly evaluate your specific condition and circumstances. They can provide guidance tailored to your individual needs and medical history.";
   }
 
   getMockResponse(patientData) {

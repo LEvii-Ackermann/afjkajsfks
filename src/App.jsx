@@ -9,6 +9,7 @@ import AnalysisLoading from './pages/AnalysisLoading';
 import ResultsPage from './pages/ResultsPage';
 import ProviderListing from './pages/ProviderListing';
 import './App.css';
+import ChatInterface from './components/chat/ChatInterface.jsx';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('landing');
@@ -70,6 +71,9 @@ function App() {
         
       case 'results':
         return <ResultsPage onNavigate={navigateTo} />;
+
+      case 'chat':
+        return <ChatInterface onNavigate={navigateTo} />;    
         
       case 'provider-listing':
         return <ProviderListing onNavigate={navigateTo} />;
