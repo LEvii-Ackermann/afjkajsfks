@@ -16,6 +16,10 @@ const SymptomInput = ({ onNavigate, patientData, updatePatientData }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [emergencyDetected, setEmergencyDetected] = useState(null);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+  
+  // NEW: Prevent repeated emergency warnings
+  const [emergencyWarningShown, setEmergencyWarningShown] = useState(false);
+  const [lastWarningSymptoms, setLastWarningSymptoms] = useState('');
 
   // Emergency detection timeout
   const emergencyTimeoutRef = useRef(null);
@@ -165,9 +169,12 @@ const SymptomInput = ({ onNavigate, patientData, updatePatientData }) => {
                 selectedSymptoms: selectedSymptoms
               });
               
-              if (emergency.isEmergency && emergency.confidence > 0.7) {
+              // FIXED: Only show modal if emergency detected AND not already shown for these symptoms
+              if (emergency.isEmergency && emergency.confidence > 0.7 && !emergencyWarningShown) {
                 setEmergencyDetected(emergency);
                 setShowEmergencyModal(true);
+                setEmergencyWarningShown(true);
+                setLastWarningSymptoms(allSymptoms);
               }
             } catch (error) {
               console.error('Emergency detection error:', error);
@@ -185,10 +192,16 @@ const SymptomInput = ({ onNavigate, patientData, updatePatientData }) => {
         clearTimeout(emergencyTimeoutRef.current);
       }
     };
-  }, [symptomText, selectedSymptoms, severity, patientData?.age, currentContent]);
+  }, [symptomText, selectedSymptoms, severity, patientData?.age, currentContent, emergencyWarningShown]);
 
   // Handle symptom text change
   const handleSymptomTextChange = (text) => {
+    // FIXED: Reset emergency warning if user makes significant changes to symptoms
+    if (emergencyWarningShown && Math.abs(text.length - symptomText.length) > 10) {
+      setEmergencyWarningShown(false);
+      setLastWarningSymptoms('');
+    }
+    
     setSymptomText(text);
     updatePatientData({ symptoms: text });
   };
@@ -198,6 +211,20 @@ const SymptomInput = ({ onNavigate, patientData, updatePatientData }) => {
     const newSelectedSymptoms = selectedSymptoms.includes(symptomId) 
       ? selectedSymptoms.filter(s => s !== symptomId)
       : [...selectedSymptoms, symptomId];
+    
+    // FIXED: Reset emergency warning if user changes selected symptoms significantly
+    if (emergencyWarningShown && Math.abs(newSelectedSymptoms.length - selectedSymptoms.length) > 0) {
+      // Check if they're removing emergency symptoms
+      const emergencySymptomIds = ['chest-pain', 'breathing'];
+      const removedEmergencySymptom = emergencySymptomIds.some(id => 
+        selectedSymptoms.includes(id) && !newSelectedSymptoms.includes(id)
+      );
+      
+      if (removedEmergencySymptom) {
+        setEmergencyWarningShown(false);
+        setLastWarningSymptoms('');
+      }
+    }
     
     setSelectedSymptoms(newSelectedSymptoms);
     updatePatientData({ selectedSymptoms: newSelectedSymptoms });
@@ -232,8 +259,10 @@ const SymptomInput = ({ onNavigate, patientData, updatePatientData }) => {
     onNavigate('emergency-triage');
   };
 
+  // FIXED: Don't reset emergency warning when user chooses to continue
   const handleContinueAnalysis = () => {
     setShowEmergencyModal(false);
+    // Keep emergencyWarningShown as true so modal doesn't reappear
   };
 
   // Handle form submission
@@ -335,7 +364,7 @@ const SymptomInput = ({ onNavigate, patientData, updatePatientData }) => {
             />
           </div>
 
-          {/* Voice Input - */}
+          {/* Voice Input */}
           <div style={{ marginBottom: '2rem' }}>
             <label style={{ 
               display: 'block', 

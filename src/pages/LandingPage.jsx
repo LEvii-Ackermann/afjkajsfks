@@ -9,7 +9,7 @@ const LandingPage = ({ onNavigate }) => {
   // Content in different languages
   const content = {
     en: {
-      title: "AI Healthcare Assistant",
+      title: "Health Garden",
       subtitle: "Get instant medical guidance in your language",
       description: "Describe your symptoms and get preliminary medical advice, find nearby healthcare providers, and access health education resources.",
       features: [
