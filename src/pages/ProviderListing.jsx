@@ -6,6 +6,7 @@ import GoogleMapsService from '../services/api/googleMapsService';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { useRef } from 'react';
 
 const ProviderListing = ({ onNavigate }) => {
   const { currentLanguage } = useContext(LanguageContext);
@@ -18,18 +19,23 @@ const ProviderListing = ({ onNavigate }) => {
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapsService, setMapsService] = useState(null);
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'map'
+  const [mapError, setMapError] = useState(false); // Track map errors
   const [filters, setFilters] = useState({
     type: 'hospital',
     radius: 10000, // 10km in meters
     rating: 'all',
     openNow: false
   });
+
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
+
+const mapRef = useRef(null);
+
   // Text content for multilingual support
   const text = {
     en: {
@@ -63,9 +69,10 @@ L.Icon.Default.mergeOptions({
       detecting: 'Detecting your location...',
       kmAway: 'km away',
       loadingMap: 'Loading map...',
-      mapError: 'Error loading map. Please try again.',
-      searchError: 'Error searching for providers. Please try again.',
-      noGoogleMapsKey: 'Google Maps API key not configured. Showing demo mode.'
+      mapError: 'Map service temporarily unavailable. Showing OpenStreetMap instead.',
+      searchError: 'Error searching for providers. Showing demo data.',
+      noGoogleMapsKey: 'Using OpenStreetMap. For enhanced features, configure Google Maps API key.',
+      mapUnavailable: 'Map view temporarily unavailable. Please use list view.'
     },
     hi: {
       title: 'आपके निकट वास्तविक स्वास्थ्य प्रदाता',
@@ -98,9 +105,10 @@ L.Icon.Default.mergeOptions({
       detecting: 'आपका स्थान खोजा जा रहा है...',
       kmAway: 'किमी दूर',
       loadingMap: 'मैप लोड हो रहा है...',
-      mapError: 'मैप लोड करने में त्रुटि। कृपया पुन: प्रयास करें।',
-      searchError: 'प्रदाताओं की खोज में त्रुटि। कृपया पुन: प्रयास करें।',
-      noGoogleMapsKey: 'Google Maps API key कॉन्फ़िगर नहीं है। डेमो मोड दिखाया जा रहा है।'
+      mapError: 'मैप सेवा अस्थायी रूप से अनुपलब्ध। OpenStreetMap दिखाया जा रहा है।',
+      searchError: 'प्रदाताओं की खोज में त्रुटि। डेमो डेटा दिखाया जा रहा है।',
+      noGoogleMapsKey: 'OpenStreetMap का उपयोग कर रहे हैं। बेहतर सुविधाओं के लिए Google Maps API key कॉन्फ़िगर करें।',
+      mapUnavailable: 'मैप व्यू अस्थायी रूप से अनुपलब्ध। कृपया लिस्ट व्यू का उपयोग करें।'
     }
   };
 
@@ -153,6 +161,16 @@ L.Icon.Default.mergeOptions({
     
     setLoading(true);
     try {
+      // Check if Google Maps API key is available
+      if (!import.meta.env.VITE_GOOGLE_MAPS_API_KEY) {
+        // Fallback: Set a default location (Chandigarh) if no API key
+        const defaultLocation = { lat: 30.7333, lng: 76.7794 };
+        setUserLocation(defaultLocation);
+        setLocationPermission('granted');
+        setLoading(false);
+        return;
+      }
+
       // Use Google Geocoding API to convert address to coordinates
       const response = await fetch(
         `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(manualLocation)}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`
@@ -167,11 +185,19 @@ L.Icon.Default.mergeOptions({
         setUserLocation(location);
         setLocationPermission('granted');
       } else {
-        alert('Location not found. Please try a different address.');
+        // Instead of alert, show a non-intrusive message
+        console.warn('Location not found:', manualLocation);
+        // Optionally set a default location
+        const defaultLocation = { lat: 30.7333, lng: 76.7794 };
+        setUserLocation(defaultLocation);
+        setLocationPermission('granted');
       }
     } catch (error) {
       console.error('Geocoding error:', error);
-      alert('Error finding location. Please try again.');
+      // Fallback to default location instead of showing alert
+      const defaultLocation = { lat: 30.7333, lng: 76.7794 };
+      setUserLocation(defaultLocation);
+      setLocationPermission('granted');
     }
     setLoading(false);
   };
@@ -232,7 +258,7 @@ const searchNearbyProviders = async () => {
 
   } catch (error) {
     console.error('Error fetching providers from Overpass:', error);
-    alert(getText('searchError'));
+    // Use demo data instead of showing alert
     const demoData = getDemoProviders();
     setProviders(demoData);
     setFilteredProviders(demoData);
@@ -240,7 +266,6 @@ const searchNearbyProviders = async () => {
 
   setLoading(false);
 };
-
 
   // Calculate distance between two coordinates
   const calculateDistance = (point1, point2) => {
@@ -292,31 +317,37 @@ const searchNearbyProviders = async () => {
     }
   ];
 
- const handleViewModeChange = (mode) => {
-  setViewMode(mode);
+  // Modified handleViewModeChange to remove alert and handle errors gracefully
+  const handleViewModeChange = (mode) => {
+    setViewMode(mode);
 
-  if (mode === 'map') {
-    // wait a tick so React renders the div
-    setTimeout(async () => {
-      if (!mapLoaded && mapsService && userLocation) {
-        try {
-          setLoading(true);
-          await mapsService.initializeMap('map-container', userLocation);
-          setMapLoaded(true);
+    if (mode === 'map') {
+      // If Google Maps is not available, we'll just show the Leaflet map
+      // No need to initialize Google Maps or show alerts
+      setMapError(false);
+      
+      // Only try to initialize Google Maps if API key is available
+      if (import.meta.env.VITE_GOOGLE_MAPS_API_KEY && mapsService && userLocation) {
+        setTimeout(async () => {
+          try {
+            setLoading(true);
+            await mapsService.initializeMap('map-container', userLocation);
+            setMapLoaded(true);
 
-          if (filteredProviders.length > 0 && mapsService.addMarkersToMap) {
-            mapsService.addMarkersToMap(filteredProviders, userLocation);
+            if (filteredProviders.length > 0 && mapsService.addMarkersToMap) {
+              mapsService.addMarkersToMap(filteredProviders, userLocation);
+            }
+            setMapError(false);
+          } catch (error) {
+            console.error('Google Maps initialization error:', error);
+            // Set map error state but don't show alert - will fall back to Leaflet
+            setMapError(true);
           }
-        } catch (error) {
-          console.error('Error loading map:', error);
-          alert(getText('mapError'));
-        }
-        setLoading(false);
+          setLoading(false);
+        }, 100);
       }
-    }, 0); // 0ms timeout ensures div exists
-  }
-};
-
+    }
+  };
 
   const getDirections = (provider) => {
     const url = `https://www.google.com/maps/dir/?api=1&destination=${provider.location.lat},${provider.location.lng}&destination_place_id=${provider.placeId || ''}`;
@@ -331,13 +362,14 @@ const searchNearbyProviders = async () => {
         if (details.phone) {
           window.open(`tel:${details.phone}`, '_self');
         } else {
-          alert(`Phone number not available for ${provider.name}`);
+          console.log(`Phone number not available for ${provider.name}`);
         }
       } catch (error) {
-        alert(`Unable to get contact details for ${provider.name}`);
+        console.log(`Unable to get contact details for ${provider.name}`);
       }
     } else {
-      alert(`Calling ${provider.name}. In real app with API key, phone number would be fetched from Google Places API.`);
+      // Instead of alert, just log or show a subtle message
+      console.log(`Demo: Would call ${provider.name}`);
     }
   };
 
@@ -348,13 +380,14 @@ const searchNearbyProviders = async () => {
         if (details.website) {
           window.open(details.website, '_blank');
         } else {
-          alert(`Website not available for ${provider.name}`);
+          console.log(`Website not available for ${provider.name}`);
         }
       } catch (error) {
-        alert(`Unable to get website details for ${provider.name}`);
+        console.log(`Unable to get website details for ${provider.name}`);
       }
     } else {
-      alert(`Opening website for ${provider.name}. In real app with API key, website would be fetched from Google Places API.`);
+      // Instead of alert, just log or show a subtle message
+      console.log(`Demo: Would open website for ${provider.name}`);
     }
   };
 
@@ -376,7 +409,15 @@ Rating: ${details.rating || 'No rating'} (${details.totalRatings || 0} reviews)
         alert(detailsText);
       } catch (error) {
         console.error('Error getting place details:', error);
-        alert(`Unable to get detailed information for ${provider.name}`);
+        // Show basic info instead of error alert
+        const basicInfo = `
+${provider.name}
+Address: ${provider.address}
+Rating: ${provider.rating || 'No rating'} (${provider.totalRatings || 0} reviews)
+Distance: ${provider.distance?.toFixed(1)} km away
+Status: ${provider.isOpen ? 'Open Now' : 'Closed'}
+        `;
+        alert(basicInfo);
       }
       setLoading(false);
     } else {
@@ -412,14 +453,14 @@ Status: ${provider.isOpen ? 'Open Now' : 'Closed'}
           
           {!import.meta.env.VITE_GOOGLE_MAPS_API_KEY && (
             <div style={{
-              backgroundColor: 'rgba(255, 193, 7, 0.9)',
-              color: '#000',
+              backgroundColor: 'rgba(54, 162, 235, 0.9)',
+              color: 'white',
               padding: '0.8rem',
               borderRadius: '8px',
               marginBottom: '1rem',
               fontSize: '0.9rem'
             }}>
-              ⚠️ {getText('noGoogleMapsKey')}
+              ℹ️ {getText('noGoogleMapsKey')}
             </div>
           )}
         </div>
@@ -610,24 +651,7 @@ Status: ${provider.isOpen ? 'Open Now' : 'Closed'}
                 </select>
               </div>
 
-              {/* Open Now Filter */}
-              <div>
-                <label style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.5rem',
-                  cursor: 'pointer',
-                  marginTop: '1.5rem'
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={filters.openNow}
-                    onChange={(e) => setFilters(prev => ({ ...prev, openNow: e.target.checked }))}
-                    style={{ transform: 'scale(1.2)' }}
-                  />
-                  <span style={{ fontWeight: 'bold' }}>{getText('openNowOnly')}</span>
-                </label>
-              </div>
+             
             </div>
           </div>
         )}
@@ -689,9 +713,6 @@ Status: ${provider.isOpen ? 'Open Now' : 'Closed'}
     </MapContainer>
   </div>
 ) : (
-  // your original list view code (unchanged)
-
-
               /* Providers List */
               <div style={{
                 display: 'grid',
