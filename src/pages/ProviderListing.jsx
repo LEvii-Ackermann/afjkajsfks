@@ -3,6 +3,9 @@ import React, { useState, useEffect, useContext } from 'react';
 import { LanguageContext } from '../context/LanguageContext';
 import Button from '../components/common/Button';
 import GoogleMapsService from '../services/api/googleMapsService';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 
 const ProviderListing = ({ onNavigate }) => {
   const { currentLanguage } = useContext(LanguageContext);
@@ -21,7 +24,12 @@ const ProviderListing = ({ onNavigate }) => {
     rating: 'all',
     openNow: false
   });
-
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
   // Text content for multilingual support
   const text = {
     en: {
@@ -284,25 +292,31 @@ const searchNearbyProviders = async () => {
     }
   ];
 
-  const handleViewModeChange = async (mode) => {
-    setViewMode(mode);
-    
-    if (mode === 'map' && !mapLoaded && mapsService && userLocation) {
-      try {
-        setLoading(true);
-        await mapsService.initializeMap('map-container', userLocation);
-        setMapLoaded(true);
-        
-        if (filteredProviders.length > 0 && mapsService.addMarkersToMap) {
-          mapsService.addMarkersToMap(filteredProviders, userLocation);
+ const handleViewModeChange = (mode) => {
+  setViewMode(mode);
+
+  if (mode === 'map') {
+    // wait a tick so React renders the div
+    setTimeout(async () => {
+      if (!mapLoaded && mapsService && userLocation) {
+        try {
+          setLoading(true);
+          await mapsService.initializeMap('map-container', userLocation);
+          setMapLoaded(true);
+
+          if (filteredProviders.length > 0 && mapsService.addMarkersToMap) {
+            mapsService.addMarkersToMap(filteredProviders, userLocation);
+          }
+        } catch (error) {
+          console.error('Error loading map:', error);
+          alert(getText('mapError'));
         }
-      } catch (error) {
-        console.error('Error loading map:', error);
-        alert(getText('mapError'));
+        setLoading(false);
       }
-      setLoading(false);
-    }
-  };
+    }, 0); // 0ms timeout ensures div exists
+  }
+};
+
 
   const getDirections = (provider) => {
     const url = `https://www.google.com/maps/dir/?api=1&destination=${provider.location.lat},${provider.location.lng}&destination_place_id=${provider.placeId || ''}`;
@@ -636,36 +650,48 @@ Status: ${provider.isOpen ? 'Open Now' : 'Closed'}
 
         {/* Content Area */}
         {userLocation && !loading && (
-          <>
-            {viewMode === 'map' ? (
-              <div style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                borderRadius: '15px',
-                padding: '1rem',
-                marginBottom: '1.5rem',
-                height: '500px'
-              }}>
-                <div 
-                  id="map-container" 
-                  style={{ 
-                    width: '100%', 
-                    height: '100%', 
-                    borderRadius: '10px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: '#f0f0f0'
-                  }}
-                >
-                  {!mapLoaded && (
-                    <div style={{ textAlign: 'center', color: '#666' }}>
-                      <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🗺️</div>
-                      <p>{getText('loadingMap')}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
+          <>{viewMode === 'map' ? (
+  <div style={{
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: '15px',
+    padding: '1rem',
+    marginBottom: '1.5rem',
+    height: '500px'
+  }}>
+    <MapContainer
+      center={[userLocation.lat, userLocation.lng]}
+      zoom={13}
+      style={{ width: '100%', height: '100%', borderRadius: '10px' }}
+    >
+      <TileLayer
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='© <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
+      />
+      
+      {/* User Location Marker */}
+      <Marker position={[userLocation.lat, userLocation.lng]}>
+        <Popup>📍 {getText('locationDetected')}</Popup>
+      </Marker>
+
+      {/* Provider Markers */}
+      {filteredProviders.map((provider) => (
+        <Marker
+          key={provider.id}
+          position={[provider.location.lat, provider.location.lng]}
+        >
+          <Popup>
+            <strong>{provider.name}</strong><br/>
+            {provider.address}<br/>
+            📏 {provider.distance?.toFixed(1)} km away
+          </Popup>
+        </Marker>
+      ))}
+    </MapContainer>
+  </div>
+) : (
+  // your original list view code (unchanged)
+
+
               /* Providers List */
               <div style={{
                 display: 'grid',
