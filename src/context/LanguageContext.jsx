@@ -1,150 +1,268 @@
 // src/context/LanguageContext.jsx
 import React, { createContext, useState, useContext } from 'react';
 
-// Create the context
-export const LanguageContext = createContext();
+// Create the context with default values for better Fast Refresh compatibility
+export const LanguageContext = createContext({
+  currentLanguage: 'en',
+  changeLanguage: () => {},
+  getCurrentLanguage: () => ({}),
+  getAvailableLanguages: () => ([]),
+  getTranslation: () => '',
+  translations: {},
+  loadingTranslations: false,
+  availableLanguages: []
+});
 
-// Language data
+// Expanded language data with major Indian languages
 const languages = {
   en: {
     code: 'en',
     name: 'English',
     nativeName: 'English',
-    flag: '🇺🇸'
+    flag: '🇬🇧',
+    translations: {
+      welcome: 'Welcome to AI Health Assistant',
+      getStarted: 'Get Started',
+      emergency: 'Emergency Call 108',
+      chooseLanguage: 'Choose Your Language',
+      back: 'Back',
+      // Medical terms
+      symptoms: 'Symptoms',
+      severity: 'Severity',
+      duration: 'Duration',
+      analyze: 'Analyze Symptoms',
+      loading: 'Analyzing your symptoms...',
+      results: 'Analysis Results',
+      // Emergency terms
+      emergencyDetected: 'Emergency Detected',
+      callEmergency: 'Call Emergency Services',
+      getGuidance: 'Get Emergency Guidance'
+    }
   },
   hi: {
     code: 'hi',
     name: 'Hindi',
     nativeName: 'हिन्दी',
-    flag: '🇮🇳'
+    flag: '🇮🇳',
+    translations: {
+      welcome: 'एआई स्वास्थ्य सहायक में आपका स्वागत है',
+      getStarted: 'शुरू करें',
+      emergency: 'आपातकाल कॉल 108',
+      chooseLanguage: 'अपनी भाषा चुनें',
+      back: 'वापस',
+      // Medical terms
+      symptoms: 'लक्षण',
+      severity: 'गंभीरता',
+      duration: 'अवधि',
+      analyze: 'लक्षणों का विश्लेषण करें',
+      loading: 'आपके लक्षणों का विश्लेषण कर रहे हैं...',
+      results: 'विश्लेषण परिणाम',
+      // Emergency terms
+      emergencyDetected: 'आपातकाल का पता चला',
+      callEmergency: 'आपातकालीन सेवाओं को कॉल करें',
+      getGuidance: 'आपातकालीन मार्गदर्शन प्राप्त करें'
+    }
   },
+  // Bengali
   bn: {
     code: 'bn',
     name: 'Bengali',
     nativeName: 'বাংলা',
-    flag: '🇧🇩'
+    flag: '🟡',
+    translations: {} // Will be translated dynamically
   },
+  // Tamil
   ta: {
     code: 'ta',
     name: 'Tamil',
     nativeName: 'தமிழ்',
-    flag: '🏴'
+    flag: '🔴',
+    translations: {} // Will be translated dynamically
   },
+  // Telugu
   te: {
     code: 'te',
     name: 'Telugu',
-    nativeName: 'తెలుগు',
-    flag: '🏴'
+    nativeName: 'తెలుగు',
+    flag: '🟢',
+    translations: {} // Will be translated dynamically
   },
+  // Gujarati
   gu: {
     code: 'gu',
     name: 'Gujarati',
     nativeName: 'ગુજરાતી',
-    flag: '🏴'
+    flag: '🟠',
+    translations: {} // Will be translated dynamically
+  },
+  // Marathi
+  mr: {
+    code: 'mr',
+    name: 'Marathi',
+    nativeName: 'मराठी',
+    flag: '🟣',
+    translations: {} // Will be translated dynamically
+  },
+  // Kannada
+  kn: {
+    code: 'kn',
+    name: 'Kannada',
+    nativeName: 'ಕನ್ನಡ',
+    flag: '🔵',
+    translations: {} // Will be translated dynamically
+  },
+  // Malayalam
+  ml: {
+    code: 'ml',
+    name: 'Malayalam',
+    nativeName: 'മലയാളം',
+    flag: '🟤',
+    translations: {} // Will be translated dynamically
+  },
+  // Punjabi
+  pa: {
+    code: 'pa',
+    name: 'Punjabi',
+    nativeName: 'ਪੰਜਾਬੀ',
+    flag: '⚫',
+    translations: {} // Will be translated dynamically
   }
 };
 
-// Translations
-const translations = {
-  en: {
-    welcome: "Welcome to AI Healthcare",
-    getStarted: "Get Started",
-    emergency: "Emergency? Call 108",
-    chooseLanguage: "Choose Your Language",
-    back: "Back",
-    continue: "Continue",
-    next: "Next"
-  },
-  hi: {
-    welcome: "AI स्वास्थ्य सेवा में आपका स्वागत है",
-    getStarted: "शुरू करें",
-    emergency: "आपातकाल? 108 पर कॉल करें",
-    chooseLanguage: "अपनी भाषा चुनें",
-    back: "वापस",
-    continue: "जारी रखें",
-    next: "अगला"
-  },
-  bn: {
-    welcome: "AI স্বাস্থ্যসেবায় স্वাগতम",
-    getStarted: "শুরু করুন",
-    emergency: "জরুরি? ১০৮ এ কল করুন",
-    chooseLanguage: "আপনার ভাষা বেছে নিন",
-    back: "পিছনে",
-    continue: "চালিয়ে যান",
-    next: "পরবর্তী"
-  },
-  ta: {
-    welcome: "AI சுகாதாரத்திற்கு வரவேற்கிறோம்",
-    getStarted: "தொடங்குங்கள்",
-    emergency: "அவசரம்? 108 க்கு அழைக்கவும்",
-    chooseLanguage: "உங்கள் மொழியைத் தேர்ந்தெடுக்கவும்",
-    back: "பின்னோக்கி",
-    continue: "தொடরவும்",
-    next: "அடுத்து"
-  },
-  te: {
-    welcome: "AI ఆరోగ్య సేవకు స్వాగతం",
-    getStarted: "ప్రారంభించండి",
-    emergency: "అత్యవసరం? 108కు కాల్ చేయండి",
-    chooseLanguage: "మీ భాషను ఎంచుకోండి",
-    back: "వెనుకకు",
-    continue: "కొనసాగించు",
-    next: "తరువాత"
-  },
-  gu: {
-    welcome: "AI આરોગ્યસેવામાં આપનું સ્વાગત છે",
-    getStarted: "શરૂ કરો",
-    emergency: "કટોકટી? 108 પર કૉલ કરો",
-    chooseLanguage: "તમારી ભાષા પસંદ કરો",
-    back: "પાછળ",
-    continue: "ચાલુ રાખો",
-    next: "આગલું"
-  }
-};
+// Translation cache to avoid repeated API calls
+const translationCache = {};
 
-// Context Provider Component
+// Translation Service Class
+class TranslationService {
+  constructor() {
+    this.apiKey = import.meta.env.VITE_GOOGLE_TRANSLATE_API_KEY;
+    this.baseURL = 'https://translation.googleapis.com/language/translate/v2';
+  }
+
+  async translateText(text, targetLanguage, sourceLanguage = 'en') {
+    // Check cache first
+    const cacheKey = `${text}_${sourceLanguage}_${targetLanguage}`;
+    if (translationCache[cacheKey]) {
+      return translationCache[cacheKey];
+    }
+
+    // If no API key, return original text
+    if (!this.apiKey) {
+      console.warn('Google Translate API key not found. Using original text.');
+      return text;
+    }
+
+    try {
+      const response = await fetch(`${this.baseURL}?key=${this.apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          q: text,
+          target: targetLanguage,
+          source: sourceLanguage,
+          format: 'text'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Translation API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const translatedText = data.data.translations[0].translatedText;
+      
+      // Cache the translation
+      translationCache[cacheKey] = translatedText;
+      
+      return translatedText;
+    } catch (error) {
+      console.error('Translation error:', error);
+      return text; // Return original text on error
+    }
+  }
+
+  async translateObject(textObject, targetLanguage) {
+    const translatedObject = {};
+    
+    for (const [key, value] of Object.entries(textObject)) {
+      if (typeof value === 'string') {
+        translatedObject[key] = await this.translateText(value, targetLanguage);
+      } else {
+        translatedObject[key] = value;
+      }
+    }
+    
+    return translatedObject;
+  }
+}
+
+const translationService = new TranslationService();
+
+// Language Provider Component
 export const LanguageProvider = ({ children }) => {
   const [currentLanguage, setCurrentLanguage] = useState('en');
+  const [loadingTranslations, setLoadingTranslations] = useState(false);
 
-  const changeLanguage = (languageCode) => {
-    if (languages[languageCode]) {
-      setCurrentLanguage(languageCode);
-      localStorage.setItem('selectedLanguage', languageCode);
+  const changeLanguage = async (languageCode) => {
+    setCurrentLanguage(languageCode);
+    
+    // If it's English or Hindi, no translation needed (already have static translations)
+    if (languageCode === 'en' || languageCode === 'hi') {
+      return;
     }
+
+    // Check if translations already exist
+    if (languages[languageCode] && Object.keys(languages[languageCode].translations).length > 0) {
+      return;
+    }
+
+    // Translate dynamically for other languages
+    setLoadingTranslations(true);
+    try {
+      const englishTranslations = languages.en.translations;
+      const translatedObject = await translationService.translateObject(
+        englishTranslations, 
+        languageCode
+      );
+      
+      // Update the language object with translations
+      languages[languageCode].translations = translatedObject;
+    } catch (error) {
+      console.error('Failed to load translations:', error);
+      // Fallback to English
+      setCurrentLanguage('en');
+    }
+    setLoadingTranslations(false);
   };
 
   const getCurrentLanguage = () => {
-    return languages[currentLanguage];
-  };
-
-  const getTranslation = (key) => {
-    return translations[currentLanguage]?.[key] || translations.en[key] || key;
+    return languages[currentLanguage] || languages.en;
   };
 
   const getAvailableLanguages = () => {
     return Object.values(languages);
   };
 
-  // Initialize language from localStorage if available
-  React.useEffect(() => {
-    const savedLanguage = localStorage.getItem('selectedLanguage');
-    if (savedLanguage && languages[savedLanguage]) {
-      setCurrentLanguage(savedLanguage);
-    }
-  }, []);
+  // Get translations with fallback
+  const getTranslation = (key) => {
+    const currentLang = getCurrentLanguage();
+    return currentLang.translations[key] || languages.en.translations[key] || key;
+  };
 
+  // Context value
   const contextValue = {
-    // New pattern (for files that want to use it)
     currentLanguage,
     changeLanguage,
     getCurrentLanguage,
-    getTranslation,
     getAvailableLanguages,
-    languages,
-    translations: translations[currentLanguage] || translations.en,
-
-    // Backwards compatible properties (for your existing files)
-    availableLanguages: Object.values(languages),
+    getTranslation,
+    translations: getCurrentLanguage().translations,
+    loadingTranslations,
+    
+    // Backwards compatibility with your existing code
+    availableLanguages: getAvailableLanguages(),
   };
 
   return (
@@ -154,25 +272,13 @@ export const LanguageProvider = ({ children }) => {
   );
 };
 
-// Custom hook to use the Language Context - BACKWARDS COMPATIBLE
+// Custom hook for backwards compatibility
 export const useLanguage = () => {
   const context = useContext(LanguageContext);
   if (!context) {
     throw new Error('useLanguage must be used within a LanguageProvider');
   }
-  
-  // Return backwards compatible structure
-  return {
-    currentLanguage: context.currentLanguage,
-    changeLanguage: context.changeLanguage,
-    getCurrentLanguage: context.getCurrentLanguage,
-    getTranslation: context.getTranslation,
-    translations: context.translations,
-    
-    // Your existing code expects these:
-    availableLanguages: context.availableLanguages,
-  };
+  return context;
 };
 
-// Export default for convenience
-export default LanguageContext;
+// No default export needed - using named export above
