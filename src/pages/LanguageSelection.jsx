@@ -4,7 +4,7 @@ import { useLanguage } from '../context/LanguageContext';
 import Button from '../components/common/Button';
 
 const LanguageSelection = ({ onNavigate }) => {
-  const { availableLanguages, changeLanguage, loadingTranslations } = useLanguage();
+  const { availableLanguages, changeLanguage, loadingTranslations, getTranslation } = useLanguage();
 
   const handleLanguageSelect = async (languageCode) => {
     // Show loading state for dynamic translations
@@ -34,7 +34,7 @@ const LanguageSelection = ({ onNavigate }) => {
           marginBottom: '2rem',
           textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
         }}>
-          Choose Your Language / अपनी भाषा चुनें
+          {getTranslation('chooseLanguage') || 'Choose Your Language'} / अपनी भाषा चुनें
         </h1>
 
         {loadingTranslations && (
@@ -45,7 +45,7 @@ const LanguageSelection = ({ onNavigate }) => {
             borderRadius: '8px',
             backdropFilter: 'blur(10px)'
           }}>
-            Loading translations... / अनुवाद लोड हो रहा है...
+            {getTranslation('loadingTranslations') || 'Loading translations...'} / अनुवाद लोड हो रहा है...
           </div>
         )}
 
@@ -96,10 +96,13 @@ const LanguageSelection = ({ onNavigate }) => {
               <div style={{ fontSize: '0.9rem', opacity: 0.8 }}>
                 {language.name}
               </div>
-              {/* Show if translations are available */}
+              {/* Show if translations are available - FIXED LINE */}
               {language.code !== 'en' && language.code !== 'hi' && (
                 <div style={{ fontSize: '0.7rem', marginTop: '0.25rem', opacity: 0.6 }}>
-                  {Object.keys(language.translations).length > 0 ? '✓ Ready' : 'Auto-translate'}
+                  {(language.translations && Object.keys(language.translations).length > 0) ? 
+                    (getTranslation('ready') || '✓ Ready') : 
+                    (getTranslation('autoTranslate') || 'Auto-translate')
+                  }
                 </div>
               )}
             </button>
@@ -112,7 +115,7 @@ const LanguageSelection = ({ onNavigate }) => {
           size="medium"
           disabled={loadingTranslations}
         >
-          ← Back / वापस
+          ← {getTranslation('back')} / वापस
         </Button>
       </div>
     </div>

@@ -50,6 +50,7 @@ const ResultsPage = ({ onNavigate }) => {
 
   useEffect(() => {
     const storedResults = localStorage.getItem('analysisResults');
+    console.log(storedResults);
     const storedPatientData = localStorage.getItem('patientData');
 
     if (storedResults && storedPatientData) {

@@ -139,7 +139,7 @@ const EmergencyActions = ({ onNavigate, onBack, patientData }) => {
 
   return (
     <div style={{
-      backgroundColor: 'rgba(255, 255, 255, 0.15)',
+      backgroundColor: 'white',
       backdropFilter: 'blur(10px)',
       borderRadius: '15px',
       padding: '2rem',

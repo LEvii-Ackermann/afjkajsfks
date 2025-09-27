@@ -3,38 +3,38 @@ import { useLanguage } from '../context/LanguageContext';
 import Button from '../components/common/Button';
 
 const LandingPage = ({ onNavigate }) => {
-  const { getCurrentLanguage, changeLanguage } = useLanguage();
+  const { getTranslation, getCurrentLanguage, changeLanguage } = useLanguage();
   const currentLang = getCurrentLanguage();
 
-  // Content in different languages
+  // Content in different languages - keeping original structure but using API translations
   const content = {
     en: {
-      title: "Health Garden",
-      subtitle: "Get instant medical guidance in your language",
-      description: "Describe your symptoms and get preliminary medical advice, find nearby healthcare providers, and access health education resources.",
+      title: getTranslation('appTitle') || "Health Garden",
+      subtitle: getTranslation('appSubtitle') || "Get instant medical guidance in your language",
+      description: getTranslation('appDescription') || "Describe your symptoms and get preliminary medical advice, find nearby healthcare providers, and access health education resources.",
       features: [
-        "🏥 AI-powered symptom analysis",
-        "🗣️ Support for Indian languages",
-        "📍 Find nearby healthcare providers",
-        "💬 24/7 health support chat"
+        getTranslation('feature1') || "🏥 AI-powered symptom analysis",
+        getTranslation('feature2') || "🗣️ Support for Indian languages",
+        getTranslation('feature3') || "📍 Find nearby healthcare providers",
+        getTranslation('feature4') || "💬 24/7 health support chat"
       ],
-      getStarted: "Get Started",
-      emergency: "Emergency? Call 108",
-      trustText: "This platform provides preliminary guidance only. Always consult healthcare professionals for serious medical concerns."
+      getStarted: getTranslation('getStarted') || "Get Started",
+      emergency: getTranslation('emergency') || "Emergency? Call 108",
+      trustText: getTranslation('trustText') || "This platform provides preliminary guidance only. Always consult healthcare professionals for serious medical concerns."
     },
     hi: {
-      title: "AI स्वास्थ्य सहायक",
-      subtitle: "अपनी भाषा में तुरंत चिकित्सा सहायता प्राप्त करें",
-      description: "अपने लक्षण बताएं और प्रारंभिक चिकित्सा सलाह प्राप्त करें, आस-पास के स्वास्थ्य सेवा प्रदाता खोजें।",
+      title: getTranslation('appTitle') || "AI स्वास्थ्य सहायक",
+      subtitle: getTranslation('appSubtitle') || "अपनी भाषा में तुरंत चिकित्सा सहायता प्राप्त करें",
+      description: getTranslation('appDescription') || "अपने लक्षण बताएं और प्रारंभिक चिकित्सा सलाह प्राप्त करें, आस-पास के स्वास्थ्य सेवा प्रदाता खोजें।",
       features: [
-        "🏥 AI-संचालित लक्षण विश्लेषण",
-        "🗣️ भारतीय भाषाओं का समर्थन",
-        "📍 नजदीकी डॉक्टर खोजें",
-        "💬 24/7 स्वास्थ्य सहायता"
+        getTranslation('feature1') || "🏥 AI-संचालित लक्षण विश्लेषण",
+        getTranslation('feature2') || "🗣️ भारतीय भाषाओं का समर्थन",
+        getTranslation('feature3') || "📍 नजदीकी डॉक्टर खोजें",
+        getTranslation('feature4') || "💬 24/7 स्वास्थ्य सहायता"
       ],
-      getStarted: "शुरू करें",
-      emergency: "आपातकाल? 108 पर कॉल करें",
-      trustText: "यह प्लेटफ़ॉर्म केवल प्रारंभिक मार्गदर्शन प्रदान करता है। गंभीर चिकित्सा समस्याओं के लिए हमेशा डॉक्टर से सलाह लें।"
+      getStarted: getTranslation('getStarted') || "शुरू करें",
+      emergency: getTranslation('emergency') || "आपातकाल? 108 पर कॉल करें",
+      trustText: getTranslation('trustText') || "यह प्लेटफ़ॉर्म केवल प्रारंभिक मार्गदर्शन प्रदान करता है। गंभीर चिकित्सा समस्याओं के लिए हमेशा डॉक्टर से सलाह लें।"
     }
   };
 

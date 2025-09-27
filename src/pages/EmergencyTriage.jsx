@@ -241,7 +241,7 @@ const EmergencyTriage = ({ onNavigate, emergencyType, patientData }) => {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #d32f2f 0%, #f44336 100%)',
+      background: 'black',
       fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
       display: 'flex',
       flexDirection: 'column',
